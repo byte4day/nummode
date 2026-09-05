@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh nummode skill index from all known agent skill roots."""
+"""Refresh nummode skill index from ~/.claude/skills."""
 from __future__ import annotations
 
 import json
@@ -7,18 +7,11 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-HOME = Path.home()
-OUT_DIR = HOME / ".nummode"
-
-SKILL_ROOTS = [
-    HOME / ".agents" / "skills",
-    HOME / ".claude" / "skills",
-    HOME / ".cursor" / "skills",
-    HOME / ".codex" / "skills",
-]
+SKILLS_DIR = Path.home() / ".claude" / "skills"
+OUT_DIR = Path.home() / ".claude" / "nummode"
 
 TAG_RULES = [
-    ("process", ["brainstorm", "plan", "debug", "tdd", "test-driven", "verification", "code-review", "subagent", "dispatch", "worktree", "superpowers", "nummode"]),
+    ("process", ["brainstorm", "plan", "debug", "tdd", "test-driven", "verification", "code-review", "subagent", "dispatch", "worktree", "superpowers"]),
     ("frontend", ["frontend", "ui", "ux", "react", "next.js", "nextjs", "tailwind", "css", "landing", "design-taste", "web-design", "accessibility", "seo", "core-web-vitals", "daisyui", "shadcn"]),
     ("design", ["design", "brand", "banner", "canvas", "logo", "ip-as-logo", "theme", "tokens", "slides", "poster", "visual"]),
     ("backend", ["api", "fastapi", "django", "flask", "microservice", "architecture", "domain-model", "sql", "database", "async-python"]),
@@ -35,12 +28,7 @@ TAG_RULES = [
 ]
 
 
-def parse_skill(path: Path) -> dict | None:
-    if not path.exists():
-        return None
-    # Skip Codex system skills noise optionally under .system
-    if ".system" in path.parts:
-        return None
+def parse_skill(path: Path) -> dict:
     text = path.read_text(errors="ignore")
     name = path.parent.name
     desc = ""
@@ -55,47 +43,16 @@ def parse_skill(path: Path) -> dict | None:
             desc = re.sub(r"\s+", " ", dm.group(1).strip().strip('"').strip("'"))
     blob = f"{name} {desc}".lower()
     tags = [tag for tag, kws in TAG_RULES if any(k in blob for k in kws)] or ["general"]
-    return {
-        "name": name,
-        "desc": desc[:280],
-        "tags": tags,
-        "path": str(path),
-        "root": str(path.parent.parent),
-    }
-
-
-def collect_skills() -> list[dict]:
-    seen: set[str] = set()
-    rows: list[dict] = []
-    for root in SKILL_ROOTS:
-        if not root.is_dir():
-            continue
-        for skill_md in root.glob("*/SKILL.md"):
-            parsed = parse_skill(skill_md)
-            if not parsed:
-                continue
-            key = parsed["name"]
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append(parsed)
-        # Also one-level deeper (rare)
-        for skill_md in root.glob("*/*/SKILL.md"):
-            if ".system" in skill_md.parts:
-                continue
-            parsed = parse_skill(skill_md)
-            if not parsed:
-                continue
-            key = parsed["name"]
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append(parsed)
-    return sorted(rows, key=lambda r: r["name"])
+    return {"name": name, "desc": desc[:280], "tags": tags, "path": str(path)}
 
 
 def main() -> None:
-    rows = collect_skills()
+    rows = []
+    for d in sorted(SKILLS_DIR.iterdir()):
+        skill = d / "SKILL.md"
+        if skill.exists():
+            rows.append(parse_skill(skill))
+
     by_tag: dict[str, list] = defaultdict(list)
     for r in rows:
         for t in r["tags"]:
@@ -104,9 +61,7 @@ def main() -> None:
     lines = [
         "# nummode skill index",
         "",
-        f"_Auto-generated. {len(rows)} skills across Claude / Cursor / Codex / agents roots._",
-        "",
-        "Refresh: `python3 ~/.nummode/scripts/refresh-index.py`",
+        f"_Auto-generated. {len(rows)} skills. Refresh: `python3 ~/.claude/nummode/scripts/refresh-index.py`_",
         "",
         "## By tag",
         "",
@@ -124,7 +79,7 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "skill-index.md").write_text("\n".join(lines) + "\n")
     (OUT_DIR / "skill-index.json").write_text(json.dumps({"skills": rows}, indent=2))
-    print(f"Indexed {len(rows)} skills → {OUT_DIR / 'skill-index.md'}")
+    print(f"Indexed {len(rows)} skills")
 
 
 if __name__ == "__main__":

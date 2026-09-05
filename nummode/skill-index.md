@@ -5,7 +5,7 @@ _Not generated yet._
 After install, run:
 
 ```bash
-python3 ~/.claude/nummode/scripts/refresh-index.py
+python3 ~/.nummode/scripts/refresh-index.py
 ```
 
-This indexes whatever skills you have under `~/.claude/skills/`.
+Indexes skills from `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, and `~/.codex/skills`.

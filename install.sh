@@ -1,54 +1,135 @@
 #!/usr/bin/env bash
-# Install nummode into Claude Code (~/.claude)
+# Install nummode for Claude Code, Cursor, and Codex
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-CLAUDE_DIR="${HOME}/.claude"
-AGENTS_DIR="${CLAUDE_DIR}/agents"
-NUMMODE_DIR="${CLAUDE_DIR}/nummode"
+NUMMODE_HOME="${HOME}/.nummode"
 
-mkdir -p "${AGENTS_DIR}" "${NUMMODE_DIR}/playbooks" "${NUMMODE_DIR}/scripts"
+TARGETS="${1:-all}" # all | claude | cursor | codex
 
-cp "${ROOT}/agents/nummode.md" "${AGENTS_DIR}/nummode.md"
-cp -R "${ROOT}/nummode/playbooks/." "${NUMMODE_DIR}/playbooks/"
-cp -R "${ROOT}/nummode/scripts/." "${NUMMODE_DIR}/scripts/"
-chmod +x "${NUMMODE_DIR}/scripts/refresh-index.py" 2>/dev/null || true
+install_shared() {
+  mkdir -p "${NUMMODE_HOME}/playbooks" "${NUMMODE_HOME}/scripts"
+  cp -R "${ROOT}/nummode/playbooks/." "${NUMMODE_HOME}/playbooks/"
+  cp -R "${ROOT}/nummode/scripts/." "${NUMMODE_HOME}/scripts/"
+  chmod +x "${NUMMODE_HOME}/scripts/refresh-index.py" 2>/dev/null || true
 
-if [[ -d "${CLAUDE_DIR}/skills" ]]; then
-  python3 "${NUMMODE_DIR}/scripts/refresh-index.py"
-else
-  mkdir -p "${CLAUDE_DIR}/skills"
-  cp "${ROOT}/nummode/skill-index.md" "${NUMMODE_DIR}/skill-index.md"
-  echo "No skills found at ~/.claude/skills — placeholder index installed."
-  echo "Install skills, then run: python3 ~/.claude/nummode/scripts/refresh-index.py"
-fi
+  # Universal skill (skills.sh / ~/.agents)
+  mkdir -p "${HOME}/.agents/skills/nummode/references" "${HOME}/.agents/skills/nummode/scripts"
+  cp "${ROOT}/skills/nummode/SKILL.md" "${HOME}/.agents/skills/nummode/SKILL.md"
+  cp -R "${ROOT}/skills/nummode/references/." "${HOME}/.agents/skills/nummode/references/"
+  cp -R "${ROOT}/skills/nummode/scripts/." "${HOME}/.agents/skills/nummode/scripts/"
 
-SETTINGS="${CLAUDE_DIR}/settings.json"
-if [[ -f "${SETTINGS}" ]]; then
-  if command -v python3 >/dev/null 2>&1; then
+  python3 "${NUMMODE_HOME}/scripts/refresh-index.py" || {
+    cp "${ROOT}/nummode/skill-index.md" "${NUMMODE_HOME}/skill-index.md"
+    echo "Skill index placeholder installed (refresh later)."
+  }
+}
+
+link_skill() {
+  local dest_root="$1"
+  mkdir -p "${dest_root}"
+  local dest="${dest_root}/nummode"
+  rm -rf "${dest}"
+  ln -sfn "${HOME}/.agents/skills/nummode" "${dest}"
+  echo "  skill → ${dest}"
+}
+
+install_claude() {
+  echo "Installing Claude Code…"
+  mkdir -p "${HOME}/.claude/agents" "${HOME}/.claude/skills"
+  cp "${ROOT}/agents/claude/nummode.md" "${HOME}/.claude/agents/nummode.md"
+  link_skill "${HOME}/.claude/skills"
+
+  # Compat symlink for older paths
+  rm -rf "${HOME}/.claude/nummode"
+  ln -sfn "${NUMMODE_HOME}" "${HOME}/.claude/nummode"
+
+  local settings="${HOME}/.claude/settings.json"
+  if [[ -f "${settings}" ]]; then
     python3 - <<'PY'
 import json
 from pathlib import Path
 p = Path.home() / ".claude" / "settings.json"
 data = json.loads(p.read_text())
-if data.get("agent") != "nummode":
-    data["agent"] = "nummode"
-    p.write_text(json.dumps(data, indent=2) + "\n")
-    print("Set default agent to nummode in ~/.claude/settings.json")
-else:
-    print("Default agent already nummode")
+data["agent"] = "nummode"
+p.write_text(json.dumps(data, indent=2) + "\n")
+print("  default agent → nummode")
 PY
   else
-    echo "Install complete. To make nummode default, set \"agent\": \"nummode\" in ${SETTINGS}"
+    printf '{\n  "agent": "nummode"\n}\n' > "${settings}"
+    echo "  created settings with agent=nummode"
   fi
-else
-  printf '{\n  "agent": "nummode"\n}\n' > "${SETTINGS}"
-  echo "Created ${SETTINGS} with agent=nummode"
-fi
+  echo "  agent → ~/.claude/agents/nummode.md"
+}
+
+install_cursor() {
+  echo "Installing Cursor…"
+  mkdir -p "${HOME}/.cursor/agents" "${HOME}/.cursor/skills"
+  cp "${ROOT}/agents/cursor/nummode.md" "${HOME}/.cursor/agents/nummode.md"
+  link_skill "${HOME}/.cursor/skills"
+  echo "  agent → ~/.cursor/agents/nummode.md"
+}
+
+install_codex() {
+  echo "Installing Codex…"
+  mkdir -p "${HOME}/.codex/agents" "${HOME}/.codex/skills"
+  cp "${ROOT}/agents/codex/nummode.toml" "${HOME}/.codex/agents/nummode.toml"
+  link_skill "${HOME}/.codex/skills"
+
+  python3 - <<'PY'
+from pathlib import Path
+cfg = Path.home() / ".codex" / "config.toml"
+cfg.parent.mkdir(parents=True, exist_ok=True)
+text = cfg.read_text() if cfg.exists() else ""
+if "multi_agent" in text:
+    print("  multi_agent already present in config.toml")
+elif not text.strip():
+    cfg.write_text('personality = "pragmatic"\n\n[features]\nmulti_agent = true\n')
+    print("  created ~/.codex/config.toml with multi_agent")
+elif "[features]" in text:
+    # Insert into existing [features] table
+    lines = text.splitlines(keepends=True)
+    out = []
+    inserted = False
+    for line in lines:
+        out.append(line)
+        if not inserted and line.strip() == "[features]":
+            out.append("multi_agent = true\n")
+            inserted = True
+    if not inserted:
+        out.append("\n[features]\nmulti_agent = true\n")
+    cfg.write_text("".join(out))
+    print("  enabled multi_agent in existing [features]")
+else:
+    cfg.write_text(text.rstrip() + "\n\n[features]\nmulti_agent = true\n")
+    print("  added [features] multi_agent = true")
+PY
+  echo "  agent → ~/.codex/agents/nummode.toml"
+}
+
+install_shared
+
+case "${TARGETS}" in
+  all)
+    install_claude
+    install_cursor
+    install_codex
+    ;;
+  claude) install_claude ;;
+  cursor) install_cursor ;;
+  codex) install_codex ;;
+  *)
+    echo "Usage: ./install.sh [all|claude|cursor|codex]"
+    exit 1
+    ;;
+esac
 
 echo
-echo "nummode installed."
-echo "  Agent:  ${AGENTS_DIR}/nummode.md"
-echo "  Data:   ${NUMMODE_DIR}"
-echo "  Start:  claude --agent nummode"
-echo "  Or open a new Claude Code session (default agent is nummode)."
+echo "nummode ready (${TARGETS})."
+echo "  Shared:  ~/.nummode/"
+echo "  Skill:   ~/.agents/skills/nummode"
+echo "  Claude:  claude --agent nummode"
+echo "  Cursor:  use @nummode or the nummode skill on a big prompt"
+echo "  Codex:   spawn/select agent_type nummode (or start with the nummode role)"
+echo
+echo "Also: npx skills add 669px/nummode -g -y -a cursor -a codex -a claude-code"
