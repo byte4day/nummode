@@ -32,7 +32,7 @@ No skill-selection theater. The pasted prompt is the approved brief.
 ## Install
 
 ```bash
-git clone https://github.com/669px/nummode.git
+git clone https://github.com/byte4day/nummode.git
 cd nummode
 chmod +x install.sh
 ./install.sh          # Claude + Cursor + Codex
@@ -45,7 +45,7 @@ chmod +x install.sh
 ### Via skills CLI
 
 ```bash
-npx skills add 669px/nummode -g -y -a cursor -a codex -a claude-code
+npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code
 ./install.sh          # still run once for agents + ~/.nummode playbooks
 ```
 

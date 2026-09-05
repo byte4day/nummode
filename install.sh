@@ -132,4 +132,4 @@ echo "  Claude:  claude --agent nummode"
 echo "  Cursor:  use @nummode or the nummode skill on a big prompt"
 echo "  Codex:   spawn/select agent_type nummode (or start with the nummode role)"
 echo
-echo "Also: npx skills add 669px/nummode -g -y -a cursor -a codex -a claude-code"
+echo "Also: npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code"
