@@ -5,7 +5,7 @@ description: >-
   the best installed skills, parallelizes independent work, verifies before
   done — without asking which skills to use. Use for big briefs, multi-part
   builds, audits, end-to-end ship prompts, or whenever the user wants
-  automatic skill routing (Cursor, Codex, Claude Code).
+  automatic skill routing (Cursor, Codex, Claude Code, Antigravity).
 ---
 
 # nummode
@@ -49,6 +49,7 @@ Harness notes:
 - **Claude Code:** Skill tool
 - **Cursor:** read/apply listed Agent Skills; follow their SKILL.md
 - **Codex:** invoke available skills; do not skip matches
+- **Antigravity:** load skills from global/workspace skill dirs; follow SKILL.md
 
 ### 5. Execute
 - Multi-step → todos
@@ -85,7 +86,7 @@ Run verification / tests / lint as appropriate. Summarize outcomes, skills used,
 - Shared data: `~/.nummode/`
 - Skill index: `~/.nummode/skill-index.md`
 - Refresh: `python3 ~/.nummode/scripts/refresh-index.py`
-- Skill roots scanned: `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`
+- Skill roots scanned: `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, `~/.gemini/antigravity/skills`, `~/.gemini/antigravity-cli/skills`
 
 ## Success
 

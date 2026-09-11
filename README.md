@@ -2,7 +2,7 @@
 
 **Paste a big prompt. nummode picks the skills. Then it ships.**
 
-Works on **Claude Code**, **Cursor**, and **Codex**.
+Works on **Claude Code**, **Cursor**, **Codex**, and **Antigravity** (Gemini skill roots).
 
 ```text
 you:  [1200-word product brief]
@@ -97,7 +97,7 @@ After adding/removing skills on any harness:
 python3 ~/.nummode/scripts/refresh-index.py
 ```
 
-Indexes `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, and `~/.codex/skills`.
+Indexes `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, and Gemini / Antigravity skill roots when present.
 
 ---
 

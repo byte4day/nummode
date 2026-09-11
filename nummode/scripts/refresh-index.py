@@ -15,6 +15,9 @@ SKILL_ROOTS = [
     HOME / ".claude" / "skills",
     HOME / ".cursor" / "skills",
     HOME / ".codex" / "skills",
+    HOME / ".gemini" / "config" / "skills",
+    HOME / ".gemini" / "antigravity" / "skills",
+    HOME / ".gemini" / "antigravity-cli" / "skills",
 ]
 
 TAG_RULES = [
