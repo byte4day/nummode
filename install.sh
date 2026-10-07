@@ -5,7 +5,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 NUMMODE_HOME="${HOME}/.nummode"
 
-TARGETS="${1:-all}" # all | claude | cursor | codex
+TARGETS="all" # all | claude | cursor | codex
+SET_DEFAULT_AGENT=0
+for arg in "$@"; do
+  case "${arg}" in
+    --set-default) SET_DEFAULT_AGENT=1 ;;
+    --*)
+      echo "Unknown flag: ${arg}"
+      echo "Usage: ./install.sh [all|claude|cursor|codex] [--set-default]"
+      exit 1
+      ;;
+    all|claude|cursor|codex) TARGETS="${arg}" ;;
+    *)
+      echo "Usage: ./install.sh [all|claude|cursor|codex] [--set-default]"
+      exit 1
+      ;;
+  esac
+done
 
 install_shared() {
   mkdir -p "${NUMMODE_HOME}/playbooks" "${NUMMODE_HOME}/scripts"
@@ -13,11 +29,12 @@ install_shared() {
   cp -R "${ROOT}/nummode/scripts/." "${NUMMODE_HOME}/scripts/"
   chmod +x "${NUMMODE_HOME}/scripts/refresh-index.py" 2>/dev/null || true
 
-  # Universal skill (skills.sh / ~/.agents)
+  # Universal skill (skills.sh / ~/.agents) — keep indexer identical to ~/.nummode
   mkdir -p "${HOME}/.agents/skills/nummode/references" "${HOME}/.agents/skills/nummode/scripts"
   cp "${ROOT}/skills/nummode/SKILL.md" "${HOME}/.agents/skills/nummode/SKILL.md"
   cp -R "${ROOT}/skills/nummode/references/." "${HOME}/.agents/skills/nummode/references/"
-  cp -R "${ROOT}/skills/nummode/scripts/." "${HOME}/.agents/skills/nummode/scripts/"
+  cp "${NUMMODE_HOME}/scripts/refresh-index.py" "${HOME}/.agents/skills/nummode/scripts/refresh-index.py"
+  chmod +x "${HOME}/.agents/skills/nummode/scripts/refresh-index.py" 2>/dev/null || true
 
   python3 "${NUMMODE_HOME}/scripts/refresh-index.py" || {
     cp "${ROOT}/nummode/skill-index.md" "${NUMMODE_HOME}/skill-index.md"
@@ -29,7 +46,10 @@ link_skill() {
   local dest_root="$1"
   mkdir -p "${dest_root}"
   local dest="${dest_root}/nummode"
-  rm -rf "${dest}"
+  if [[ -e "${dest}" && ! -L "${dest}" ]]; then
+    echo "  warning: ${dest} exists and is not a symlink; leaving it alone"
+    return 0
+  fi
   ln -sfn "${HOME}/.agents/skills/nummode" "${dest}"
   echo "  skill → ${dest}"
 }
@@ -41,19 +61,28 @@ install_claude() {
   link_skill "${HOME}/.claude/skills"
 
   # Compat symlink for older paths
-  rm -rf "${HOME}/.claude/nummode"
-  ln -sfn "${NUMMODE_HOME}" "${HOME}/.claude/nummode"
+  if [[ -e "${HOME}/.claude/nummode" && ! -L "${HOME}/.claude/nummode" ]]; then
+    echo "  warning: ~/.claude/nummode exists and is not a symlink; leaving it alone"
+  else
+    ln -sfn "${NUMMODE_HOME}" "${HOME}/.claude/nummode"
+  fi
 
   local settings="${HOME}/.claude/settings.json"
   if [[ -f "${settings}" ]]; then
-    python3 - <<'PY'
+    SET_DEFAULT_AGENT="${SET_DEFAULT_AGENT}" python3 - <<'PY'
 import json
+import os
 from pathlib import Path
 p = Path.home() / ".claude" / "settings.json"
 data = json.loads(p.read_text())
-data["agent"] = "nummode"
-p.write_text(json.dumps(data, indent=2) + "\n")
-print("  default agent → nummode")
+force = os.environ.get("SET_DEFAULT_AGENT") == "1"
+current = data.get("agent")
+if force or not current:
+    data["agent"] = "nummode"
+    p.write_text(json.dumps(data, indent=2) + "\n")
+    print("  default agent → nummode")
+else:
+    print(f"  keeping existing agent={current} (pass --set-default to override)")
 PY
   else
     printf '{\n  "agent": "nummode"\n}\n' > "${settings}"
@@ -77,17 +106,20 @@ install_codex() {
   link_skill "${HOME}/.codex/skills"
 
   python3 - <<'PY'
+import re
 from pathlib import Path
 cfg = Path.home() / ".codex" / "config.toml"
 cfg.parent.mkdir(parents=True, exist_ok=True)
 text = cfg.read_text() if cfg.exists() else ""
-if "multi_agent" in text:
-    print("  multi_agent already present in config.toml")
+if re.search(r"(?m)^\s*multi_agent\s*=\s*true\s*$", text):
+    print("  multi_agent already enabled in config.toml")
+elif re.search(r"(?m)^\s*multi_agent\s*=\s*false\s*$", text):
+    cfg.write_text(re.sub(r"(?m)^(\s*multi_agent\s*=\s*)false\s*$", r"\1true", text))
+    print("  set multi_agent = true")
 elif not text.strip():
     cfg.write_text('personality = "pragmatic"\n\n[features]\nmulti_agent = true\n')
     print("  created ~/.codex/config.toml with multi_agent")
 elif "[features]" in text:
-    # Insert into existing [features] table
     lines = text.splitlines(keepends=True)
     out = []
     inserted = False
@@ -118,10 +150,6 @@ case "${TARGETS}" in
   claude) install_claude ;;
   cursor) install_cursor ;;
   codex) install_codex ;;
-  *)
-    echo "Usage: ./install.sh [all|claude|cursor|codex]"
-    exit 1
-    ;;
 esac
 
 echo
@@ -133,3 +161,4 @@ echo "  Cursor:  use @nummode or the nummode skill on a big prompt"
 echo "  Codex:   spawn/select agent_type nummode (or start with the nummode role)"
 echo
 echo "Also: npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code"
+echo "      (skills CLI alone is not enough — always run ./install.sh for playbooks + agents)"

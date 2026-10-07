@@ -2,7 +2,7 @@
 
 **Paste a big prompt. nummode picks the skills. Then it ships.**
 
-Works on **Claude Code**, **Cursor**, **Codex**, and **Antigravity** (Gemini skill roots).
+Works on **Claude Code**, **Cursor**, and **Codex**. Also indexes **Gemini / Antigravity** skill roots when present (no dedicated agent install target yet).
 
 ```text
 you:  [1200-word product brief]
@@ -44,9 +44,11 @@ chmod +x install.sh
 
 ### Via skills CLI
 
+`npx skills add` only installs the skill package. You **must** still run `./install.sh` once for playbooks, agents, and the skill index — without it nummode cannot boot.
+
 ```bash
 npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code
-./install.sh          # still run once for agents + ~/.nummode playbooks
+./install.sh          # required: agents + ~/.nummode playbooks + index
 ```
 
 ### What gets installed
@@ -55,7 +57,7 @@ npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code
 |--------|------|
 | Shared data | `~/.nummode/` (playbooks, skill index, refresh script) |
 | Universal skill | `~/.agents/skills/nummode` (+ links into each harness) |
-| Claude agent | `~/.claude/agents/nummode.md` (default `agent`) |
+| Claude agent | `~/.claude/agents/nummode.md` (sets default `agent` only if unset; pass `--set-default` to force) |
 | Cursor agent | `~/.cursor/agents/nummode.md` |
 | Codex agent role | `~/.codex/agents/nummode.toml` |
 
@@ -97,7 +99,7 @@ After adding/removing skills on any harness:
 python3 ~/.nummode/scripts/refresh-index.py
 ```
 
-Indexes `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, and Gemini / Antigravity skill roots when present.
+Indexes `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/skills`, and Antigravity skill roots when present.
 
 ---
 
@@ -124,12 +126,12 @@ Playbooks: [`nummode/playbooks/missions.md`](nummode/playbooks/missions.md)
 | Signal | Score |
 |--------|------:|
 | Description keywords overlap the prompt | +2 |
-| Mission playbook lists the skill | +2 |
+| Mission playbook lists the skill (installed) | +3 |
 | Stack matches repo/prompt | +1 |
 | Weak / generic match only | −2 |
 | Duplicates another selected skill’s job | −3 |
 
-Keep skills with score ≥ 3. Cap at 3–7. Prefer specific over generic.
+Keep installed skills with score ≥ 3. Cap at 7. Playbook-listed skills clear the bar alone. Prefer specific over generic; skip missing playbook names.
 
 ---
 
