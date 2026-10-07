@@ -39,7 +39,7 @@ Pick primary mission from `references/missions.md` (or `~/.nummode/playbooks/mis
 1. Read `~/.nummode/skill-index.md` (by-tag first)
 2. If missing/stale: `python3 ~/.nummode/scripts/refresh-index.py`
 3. Score candidates (see missions playbook)
-4. Lock **3–7** skills: process → domain → finish
+4. Lock up to **7** installed skills (score ≥ 3): process → domain → finish
 5. Announce: `nummode · <mission> · skills: a, b, c`
 
 ### 4. Invoke
@@ -86,7 +86,7 @@ Run verification / tests / lint as appropriate. Summarize outcomes, skills used,
 - Shared data: `~/.nummode/`
 - Skill index: `~/.nummode/skill-index.md`
 - Refresh: `python3 ~/.nummode/scripts/refresh-index.py`
-- Skill roots scanned: `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, `~/.gemini/antigravity/skills`, `~/.gemini/antigravity-cli/skills`
+- Skill roots scanned: `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/skills`, `~/.gemini/config/skills`, `~/.gemini/antigravity/skills`, `~/.gemini/antigravity-cli/skills`
 
 ## Success
 

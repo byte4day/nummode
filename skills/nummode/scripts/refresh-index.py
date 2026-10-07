@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh nummode skill index from ~/.claude/skills."""
+"""Refresh nummode skill index from all known agent skill roots."""
 from __future__ import annotations
 
 import json
@@ -7,11 +7,22 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-SKILLS_DIR = Path.home() / ".claude" / "skills"
-OUT_DIR = Path.home() / ".claude" / "nummode"
+HOME = Path.home()
+OUT_DIR = HOME / ".nummode"
+
+SKILL_ROOTS = [
+    HOME / ".agents" / "skills",
+    HOME / ".claude" / "skills",
+    HOME / ".cursor" / "skills",
+    HOME / ".codex" / "skills",
+    HOME / ".gemini" / "skills",
+    HOME / ".gemini" / "config" / "skills",
+    HOME / ".gemini" / "antigravity" / "skills",
+    HOME / ".gemini" / "antigravity-cli" / "skills",
+]
 
 TAG_RULES = [
-    ("process", ["brainstorm", "plan", "debug", "tdd", "test-driven", "verification", "code-review", "subagent", "dispatch", "worktree", "superpowers"]),
+    ("process", ["brainstorm", "plan", "debug", "tdd", "test-driven", "verification", "code-review", "subagent", "dispatch", "worktree", "superpowers", "nummode"]),
     ("frontend", ["frontend", "ui", "ux", "react", "next.js", "nextjs", "tailwind", "css", "landing", "design-taste", "web-design", "accessibility", "seo", "core-web-vitals", "daisyui", "shadcn"]),
     ("design", ["design", "brand", "banner", "canvas", "logo", "ip-as-logo", "theme", "tokens", "slides", "poster", "visual"]),
     ("backend", ["api", "fastapi", "django", "flask", "microservice", "architecture", "domain-model", "sql", "database", "async-python"]),
@@ -28,7 +39,27 @@ TAG_RULES = [
 ]
 
 
-def parse_skill(path: Path) -> dict:
+def _kw_match(blob: str, kw: str) -> bool:
+    """Match keywords without substring false positives (ui⊂build, rag⊂coverage)."""
+    kw = kw.lower()
+    if re.search(r"[^a-z0-9]", kw):
+        return kw in blob
+    return re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", blob) is not None
+
+
+def _normalize_desc(raw: str) -> str:
+    text = raw.strip().strip('"').strip("'")
+    # Drop YAML folded/literal block indicators left in by the frontmatter parse.
+    text = re.sub(r"^[>|][-+]?\s*", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_skill(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    # Skip Codex system skills noise optionally under .system
+    if ".system" in path.parts:
+        return None
     text = path.read_text(errors="ignore")
     name = path.parent.name
     desc = ""
@@ -40,19 +71,50 @@ def parse_skill(path: Path) -> dict:
         if nm:
             name = nm.group(1).strip().strip('"').strip("'")
         if dm:
-            desc = re.sub(r"\s+", " ", dm.group(1).strip().strip('"').strip("'"))
+            desc = _normalize_desc(dm.group(1))
     blob = f"{name} {desc}".lower()
-    tags = [tag for tag, kws in TAG_RULES if any(k in blob for k in kws)] or ["general"]
-    return {"name": name, "desc": desc[:280], "tags": tags, "path": str(path)}
+    tags = [tag for tag, kws in TAG_RULES if any(_kw_match(blob, k) for k in kws)] or ["general"]
+    return {
+        "name": name,
+        "desc": desc[:280],
+        "tags": tags,
+        "path": str(path),
+        "root": str(path.parent.parent),
+    }
+
+
+def collect_skills() -> list[dict]:
+    seen: set[str] = set()
+    rows: list[dict] = []
+    for root in SKILL_ROOTS:
+        if not root.is_dir():
+            continue
+        for skill_md in root.glob("*/SKILL.md"):
+            parsed = parse_skill(skill_md)
+            if not parsed:
+                continue
+            key = parsed["name"]
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(parsed)
+        # Also one-level deeper (rare)
+        for skill_md in root.glob("*/*/SKILL.md"):
+            if ".system" in skill_md.parts:
+                continue
+            parsed = parse_skill(skill_md)
+            if not parsed:
+                continue
+            key = parsed["name"]
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(parsed)
+    return sorted(rows, key=lambda r: r["name"])
 
 
 def main() -> None:
-    rows = []
-    for d in sorted(SKILLS_DIR.iterdir()):
-        skill = d / "SKILL.md"
-        if skill.exists():
-            rows.append(parse_skill(skill))
-
+    rows = collect_skills()
     by_tag: dict[str, list] = defaultdict(list)
     for r in rows:
         for t in r["tags"]:
@@ -61,7 +123,9 @@ def main() -> None:
     lines = [
         "# nummode skill index",
         "",
-        f"_Auto-generated. {len(rows)} skills. Refresh: `python3 ~/.claude/nummode/scripts/refresh-index.py`_",
+        f"_Auto-generated. {len(rows)} skills across Claude / Cursor / Codex / agents / Gemini roots._",
+        "",
+        "Refresh: `python3 ~/.nummode/scripts/refresh-index.py`",
         "",
         "## By tag",
         "",
@@ -79,7 +143,7 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "skill-index.md").write_text("\n".join(lines) + "\n")
     (OUT_DIR / "skill-index.json").write_text(json.dumps({"skills": rows}, indent=2))
-    print(f"Indexed {len(rows)} skills")
+    print(f"Indexed {len(rows)} skills → {OUT_DIR / 'skill-index.md'}")
 
 
 if __name__ == "__main__":

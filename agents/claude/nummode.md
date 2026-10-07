@@ -7,7 +7,6 @@ color: cyan
 permissionMode: acceptEdits
 memory: user
 skills:
-  - using-superpowers
   - nummode
 ---
 

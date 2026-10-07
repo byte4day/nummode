@@ -56,11 +56,11 @@ Pick exactly one primary mission. Secondary missions allowed only if the prompt 
 
 ## Scoring (internal)
 
-For each candidate skill, score 0–5:
+For each **installed** candidate skill, score 0–5:
 - +2 description keyword overlap with prompt nouns/verbs
-- +2 mission playbook includes it
+- +3 mission playbook includes it (playbook hits clear the bar alone)
 - +1 stack detected in repo/prompt (Next, Django, etc.)
 - −2 weak/generic match only
 - −3 duplicates another selected skill’s job
 
-Select top **3–7** with score ≥ 3. Always include a finisher when producing code.
+Select up to **7** skills with score ≥ 3. Prefer installed playbook steps; if a playbook name is missing, use the nearest installed equivalent (or proceed with a one-line note) — never invent or fake-invoke a skill. Always include a finisher when producing code.

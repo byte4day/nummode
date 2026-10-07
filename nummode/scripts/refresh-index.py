@@ -15,6 +15,7 @@ SKILL_ROOTS = [
     HOME / ".claude" / "skills",
     HOME / ".cursor" / "skills",
     HOME / ".codex" / "skills",
+    HOME / ".gemini" / "skills",
     HOME / ".gemini" / "config" / "skills",
     HOME / ".gemini" / "antigravity" / "skills",
     HOME / ".gemini" / "antigravity-cli" / "skills",
@@ -38,6 +39,21 @@ TAG_RULES = [
 ]
 
 
+def _kw_match(blob: str, kw: str) -> bool:
+    """Match keywords without substring false positives (ui⊂build, rag⊂coverage)."""
+    kw = kw.lower()
+    if re.search(r"[^a-z0-9]", kw):
+        return kw in blob
+    return re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", blob) is not None
+
+
+def _normalize_desc(raw: str) -> str:
+    text = raw.strip().strip('"').strip("'")
+    # Drop YAML folded/literal block indicators left in by the frontmatter parse.
+    text = re.sub(r"^[>|][-+]?\s*", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_skill(path: Path) -> dict | None:
     if not path.exists():
         return None
@@ -55,9 +71,9 @@ def parse_skill(path: Path) -> dict | None:
         if nm:
             name = nm.group(1).strip().strip('"').strip("'")
         if dm:
-            desc = re.sub(r"\s+", " ", dm.group(1).strip().strip('"').strip("'"))
+            desc = _normalize_desc(dm.group(1))
     blob = f"{name} {desc}".lower()
-    tags = [tag for tag, kws in TAG_RULES if any(k in blob for k in kws)] or ["general"]
+    tags = [tag for tag, kws in TAG_RULES if any(_kw_match(blob, k) for k in kws)] or ["general"]
     return {
         "name": name,
         "desc": desc[:280],
@@ -107,7 +123,7 @@ def main() -> None:
     lines = [
         "# nummode skill index",
         "",
-        f"_Auto-generated. {len(rows)} skills across Claude / Cursor / Codex / agents roots._",
+        f"_Auto-generated. {len(rows)} skills across Claude / Cursor / Codex / agents / Gemini roots._",
         "",
         "Refresh: `python3 ~/.nummode/scripts/refresh-index.py`",
         "",
