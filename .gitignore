@@ -1,8 +1,10 @@
 .DS_Store
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
 .venv/
 .env
 .env.*
 nummode/skill-index.json
 *.log
+*.bak.*

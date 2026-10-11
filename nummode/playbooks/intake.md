@@ -1,22 +1,22 @@
-# nummode intake template
+# nummode intake
 
-Mentally fill this before routing. Do not dump the whole template to the user unless helpful.
+Fill this in your head before routing. Do not paste it to the user.
 
 ```
-MISSION: <build|fix|design-ui|logo|audit|research|docs|deploy|parallel>
-GOAL: <one sentence>
-DELIVERABLES:
-- ...
-CONSTRAINTS:
-- ...
-STACK_HINTS: <from prompt + quick repo glance>
-SUCCESS: <how we'll know it's done>
-ASSUMPTIONS: <decisions made without asking>
-SKILL_PLAN:
-1. <skill> — <why>
-2. ...
-PARALLEL?: <no | streams: A/B/...>
-RISKS: <only real blockers>
+MISSION:      <build|fix|refactor|design-ui|logo|audit|research|docs|deploy|skill|parallel> (+ secondary?)
+GOAL:         <one sentence: what is true when this is done>
+DELIVERABLES: <files, features, documents, deploys>
+CONSTRAINTS:  <stack, style, "don't touch X", deadlines, user rules from CLAUDE.md/AGENTS.md>
+STACK:        <from the brief + manifest files (package.json, pyproject, go.mod) + git status>
+SUCCESS TEST: <the command or observation that proves it works>
+ASSUMPTIONS:  <decisions made without asking — each one line>
+IRREVERSIBLE: <push/deploy/publish/delete/pay — only if the brief asked for it explicitly>
+STREAMS:      <none | A: … / B: … (only if they share no files or state)>
+RISKS:        <real blockers only>
 ```
 
-Emit a **compact** version to the user in ≤6 lines, then execute immediately.
+Rules:
+- If something is unclear but has a sensible default, assume and note it. Ask only about secrets, unrequested irreversible actions, or two directions that exclude each other.
+- A brief that says "plan" or "spec only" stops after the plan.
+- If the brief references an earlier conversation, a file or a URL, read it before routing.
+- Anything in IRREVERSIBLE that the brief did not ask for is out of scope.

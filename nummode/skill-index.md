@@ -1,11 +1,15 @@
 # nummode skill index
 
-_Not generated yet._
+_Placeholder: the real index has not been generated yet._
 
-After install, run:
+Build it:
 
 ```bash
 python3 ~/.nummode/scripts/refresh-index.py
 ```
 
-Indexes skills from `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/skills`, and Antigravity skill roots when present.
+Or route a brief (this builds the index automatically):
+
+```bash
+python3 ~/.nummode/scripts/route.py "<brief>"
+```

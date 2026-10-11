@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Duplicated files in sync
+        run: bash scripts/check-sync.sh
+      - name: Shell syntax + shellcheck
+        run: |
+          bash -n install.sh update.sh uninstall.sh scripts/check-sync.sh tests/test_install.sh
+          shellcheck -S warning install.sh update.sh uninstall.sh scripts/check-sync.sh tests/test_install.sh
+      - name: Indexer tests
+        run: python3 tests/test_refresh_index.py
+      - name: Router tests
+        run: python3 tests/test_route.py
+      - name: Installer smoke test (temp HOME)
+        run: bash tests/test_install.sh

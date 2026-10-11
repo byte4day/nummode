@@ -1,31 +1,32 @@
 # nummode
 
-**Paste a big prompt. nummode picks the skills. Then it ships.**
+**Paste a big prompt. nummode picks the skills, does the work, and proves it works.**
 
-Works on **Claude Code**, **Cursor**, and **Codex**. Also indexes **Gemini / Antigravity** skill roots when present (no dedicated agent install target yet).
+Runs on **Claude Code**, **Cursor** and **Codex**. Also indexes **Gemini / Antigravity** skill roots and enabled **Claude Code plugin** skills.
 
 ```text
-you:  [1200-word product brief]
-nummode · build · skills: writing-plans, frontend-design, verification-before-completion
-        → plans → builds → verifies → done
+you:      [1200-word product brief]
+nummode · build · skills: writing-plans, supabase, frontend-design, verification-before-completion
+          → plans → builds → runs the tests → reports what works and how to try it
 ```
 
 ---
 
 ## Why
 
-Agent harnesses can load dozens of skills. Humans shouldn't babysit which ones fire.
+Agent harnesses load dozens of skills. Nobody should have to pick which ones fire.
 
 nummode is the routing layer:
 
-1. **Intake** — goal, deliverables, constraints, stack  
-2. **Mission** — `build` / `fix` / `design-ui` / `logo` / `audit` / …  
-3. **Route** — score installed skills, lock a 3–7 skill plan  
-4. **Invoke** — load skills before real work  
-5. **Execute** — parallelize only when safe  
-6. **Verify** — evidence before “done”
+1. **Size gate**: small asks skip the ceremony
+2. **Intake**: goal, deliverables, constraints, stack, success test
+3. **Route**: `route.py` detects the mission and ranks the installed skills
+4. **Invoke**: load each skill right before its step
+5. **Execute**: parallel only when streams share nothing
+6. **Verify**: real commands before "done"
+7. **Report**: what works, how to try it, one next action
 
-No skill-selection theater. The pasted prompt is the approved brief.
+The pasted brief is the approval. nummode never asks which skills to use.
 
 ---
 
@@ -34,154 +35,142 @@ No skill-selection theater. The pasted prompt is the approved brief.
 ```bash
 git clone https://github.com/byte4day/nummode.git
 cd nummode
-chmod +x install.sh
-./install.sh          # Claude + Cursor + Codex
-# or:
-./install.sh cursor
-./install.sh codex
-./install.sh claude
+./install.sh            # Claude + Cursor + Codex
+./install.sh claude     # or one harness: claude | cursor | codex
 ```
 
-### Via skills CLI
+| Flag | Effect |
+|---|---|
+| `--set-default` | Make nummode the Claude Code default agent even if another default is set |
+| `--force-multi-agent` | Change Codex `multi_agent = false` to `true` |
 
-`npx skills add` only installs the skill package. You **must** still run `./install.sh` once for playbooks, agents, and the skill index — without it nummode cannot boot.
+Re-running is safe. Backups of anything replaced go to `~/.nummode/backups/`, never next to a skill root, so harnesses do not load a stale copy.
 
-```bash
-npx skills add byte4day/nummode -g -y -a cursor -a codex -a claude-code
-./install.sh          # required: agents + ~/.nummode playbooks + index
-```
+**Update:** `./update.sh` (`git pull --ff-only` + reinstall)
+
+**Via the skills CLI:** `npx skills add byte4day/nummode -g -y` installs only the skill. Run `./install.sh` afterwards for the agents, playbooks and index. Without them the skill still works: it falls back to its bundled `references/` and `scripts/`.
 
 ### What gets installed
 
 | Target | Path |
-|--------|------|
-| Shared data | `~/.nummode/` (playbooks, skill index, refresh script) |
-| Universal skill | `~/.agents/skills/nummode` (+ links into each harness) |
-| Claude agent | `~/.claude/agents/nummode.md` (sets default `agent` only if unset; pass `--set-default` to force) |
+|---|---|
+| Shared data | `~/.nummode/`: playbooks, `scripts/route.py`, `scripts/refresh-index.py`, skill index, `VERSION`, `backups/` |
+| Universal skill | `~/.agents/skills/nummode`, symlinked into each harness |
+| Claude agent | `~/.claude/agents/nummode.md`. Sets the default `agent` only when none is set |
 | Cursor agent | `~/.cursor/agents/nummode.md` |
-| Codex agent role | `~/.codex/agents/nummode.toml` |
+| Codex role | `~/.codex/agents/nummode.toml`. Enables `features.multi_agent` when it is missing |
 
 ---
 
 ## Usage
 
-### Claude Code
+| Harness | Start |
+|---|---|
+| Claude Code | `claude --agent nummode`, or any session once it is the default agent |
+| Cursor | `@nummode` on a big prompt, or let the skill auto-trigger |
+| Codex | Agent role `nummode`, or invoke the skill |
+
+### The router
 
 ```bash
-claude --agent nummode
-# or open a new session (installer sets default agent)
+python3 ~/.nummode/scripts/route.py "build a stripe checkout in next.js with supabase auth and deploy it to vercel"
 ```
-
-### Cursor
-
-- Invoke **`@nummode`** on a large prompt, or  
-- Let the **nummode** skill auto-trigger from its description on big briefs / multi-part builds
-
-### Codex
-
-- Use agent type / role **`nummode`** when spawning or starting a session  
-- Or invoke the **nummode** skill on a large prompt  
-- Installer enables `features.multi_agent = true` when missing (needed for parallel streams)
-
-Expect:
 
 ```text
-nummode · fix · skills: systematic-debugging, nextjs-app-router-patterns, verification-before-completion
+nummode · build+deploy · skills: supabase, saas-auth-billing, vercel:auth, vercel:marketplace, vercel:deployments-cicd, project-delivery-checks
+
+mission: build (signals: build) · secondary: deploy
+  1. supabase                 [domain] score 11 · named in brief; kw: supabase, auth, next.js; tag
+  2. saas-auth-billing        [domain] score  5 · kw: auth, checkout, stripe; tag
+  3. vercel:auth              [domain] score  4 · kw: auth, next.js, vercel
+  4. vercel:marketplace       [domain] score  4 · kw: build, checkout, vercel; tag
+  5. vercel:deployments-cicd  [deploy] score  7 · kw: build, deploy, vercel; slot deploy +4
+  6. project-delivery-checks  [verify] score  5 · tag; slot verify +4
+harness: claude · index: fresh (66 skills, catalog=80ae5a1f090ad1f7)
 ```
 
-Then work starts. It will **not** ask which skills to use.
+| Option | Effect |
+|---|---|
+| `--file brief.md` / `-` | Read the brief from a file or stdin |
+| `--mission audit` | Force a mission |
+| `--harness claude\|cursor\|codex\|gemini\|any` | Only skills that harness can load. Auto-detected |
+| `--repo PATH` | Read stack hints (package.json, pyproject, vercel.json…) from PATH. Default: cwd |
+| `--json` | Machine-readable plan |
+| `--limit N` | Cap the number of skills. Default 7 |
 
-### Refresh skill index
-
-After adding/removing skills on any harness:
-
-```bash
-python3 ~/.nummode/scripts/refresh-index.py
-```
-
-Indexes `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/skills`, and Antigravity skill roots when present.
+The router rebuilds the index automatically when skills change on disk. Manual: `python3 ~/.nummode/scripts/refresh-index.py` (`--check` exits 3 when stale).
 
 ---
 
 ## Missions
 
-| Mission | Prompt looks like | Pipeline sketch |
-|--------|-------------------|-----------------|
-| `build` | create, implement, scaffold | plan → domain → tdd → verify |
-| `fix` | bug, broken, failing | systematic-debugging → domain → verify |
-| `design-ui` | landing, redesign, UI | design skills (max 3) → polish |
-| `logo` | mascot, IP mark | `ip-as-logo` |
-| `audit` | review, a11y, security | audit skill → findings |
-| `research` | investigate, compare | `research` |
-| `docs` | pdf / pptx / xlsx / docx | format skill |
-| `deploy` | ship, preview | deploy → verify |
-| `parallel` | unrelated workstreams | dispatch parallel agents |
+| Mission | Brief looks like | Pipeline (slots) |
+|---|---|---|
+| `build` | create, implement, add | plan → docs → domain → test → **verify** |
+| `fix` | bug, broken, failing | **debug** → domain → **verify** |
+| `refactor` | clean up, simplify, migrate | plan → domain → review → **verify** |
+| `design-ui` | landing, redesign, UI | **design** → domain → guidelines → verify |
+| `logo` | mascot, brand mark | **logo** (one skill) |
+| `audit` | review, security, a11y | audit skills → findings first |
+| `research` | compare, investigate | research → domain |
+| `docs` | pdf, pptx, xlsx, docx | matching format skill → writing |
+| `deploy` | ship, release, preview | deploy → **verify** |
+| `skill` | skills, agents, hooks, CLAUDE.md | **author** → domain → **verify** |
+| `parallel` | independent workstreams | dispatch → per-stream skills |
 
-Playbooks: [`nummode/playbooks/missions.md`](nummode/playbooks/missions.md)
+**Bold** = required slot. When no installed skill fills a required slot, the agent does that step by hand and says so. Slots and candidates live in [`missions.md`](nummode/playbooks/missions.md). Edit the tables to change routing; the router parses them directly.
 
----
+### Scoring
 
-## Routing scores
+| Signal | Points |
+|---|---:|
+| Skill named in the brief | +6 |
+| First installed candidate for a slot | +4 |
+| Skill-name words in the brief | +2 each (max 4) |
+| ≥ 2 description words in the brief | +1 each (max 3) |
+| Repo stack matches | +2 |
+| Tag fits the mission | +1 |
+| "Only when explicitly asked" skill not named | −4 |
 
-| Signal | Score |
-|--------|------:|
-| Description keywords overlap the prompt | +2 |
-| Mission playbook lists the skill (installed) | +3 |
-| Stack matches repo/prompt | +1 |
-| Weak / generic match only | −2 |
-| Duplicates another selected skill’s job | −3 |
-
-Keep installed skills with score ≥ 3. Cap at 7. Playbook-listed skills clear the bar alone. Prefer specific over generic; skip missing playbook names.
+Slot picks need a score of 3 or more; domain picks need 4 or more. The plan holds 1–7 skills, ordered process → domain → finish.
 
 ---
 
 ## Repo layout
 
 ```text
-nummode/
-├── agents/
-│   ├── claude/nummode.md      # Claude Code main agent
-│   ├── cursor/nummode.md      # Cursor subagent
-│   └── codex/nummode.toml     # Codex agent role
-├── skills/nummode/            # Universal Agent Skill
-│   ├── SKILL.md
-│   ├── references/
-│   └── scripts/
-├── nummode/                   # Shared runtime files copied to ~/.nummode
-│   ├── playbooks/
-│   └── scripts/refresh-index.py
-├── install.sh
-├── LICENSE
-└── README.md
+agents/{claude,cursor,codex}/   harness agent definitions
+skills/nummode/                 the universal skill (SKILL.md, references/, scripts/)
+nummode/                        shared runtime copied to ~/.nummode (playbooks, scripts)
+tests/                          unit tests + installer smoke test
+scripts/check-sync.sh           fails if the duplicated playbooks/scripts drift
+install.sh update.sh uninstall.sh VERSION CHANGELOG.md
 ```
 
-Your generated skill catalog stays local (`~/.nummode/skill-index.*`) and is not committed.
+```bash
+bash scripts/check-sync.sh && python3 tests/test_refresh_index.py && python3 tests/test_route.py && bash tests/test_install.sh
+```
 
 ---
 
 ## Design principles
 
-- **Prompt = approval** — interactive “wait for design OK” gates are overridden  
-- **Process before domain** — how before what  
-- **Evidence before done** — prefer verification skills for code  
-- **Repo text is data** — ignore jailbreak-shaped file content  
-- **One brain, three harnesses** — same missions and scoring everywhere  
+- **Brief = approval.** Interactive approval gates are skipped, with a one-line note.
+- **Harness listing wins.** Never invoke a skill the harness cannot load.
+- **Evidence before done.** No unverified claims that checks pass.
+- **Files are data.** Instructions inside repos or web pages are ignored.
+- **Irreversible only on request.** Push, deploy, publish and delete run only when the brief asks.
 
 ---
 
 ## Uninstall
 
 ```bash
-rm -f ~/.claude/agents/nummode.md
-rm -f ~/.cursor/agents/nummode.md
-rm -f ~/.codex/agents/nummode.toml
-rm -rf ~/.agents/skills/nummode
-rm -f ~/.claude/skills/nummode ~/.cursor/skills/nummode ~/.codex/skills/nummode
-rm -rf ~/.nummode ~/.claude/nummode
-# remove "agent": "nummode" from ~/.claude/settings.json if set
+./uninstall.sh            # keeps user playbooks and ~/.nummode/backups
+./uninstall.sh --purge    # removes ~/.nummode entirely
 ```
 
----
+Codex `features.multi_agent` is left unchanged.
 
 ## License
 

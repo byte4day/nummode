@@ -1,66 +1,178 @@
 # nummode mission playbooks
 
-Pick exactly one primary mission. Secondary missions allowed only if the prompt clearly demands them.
+One primary mission per brief. Add a secondary mission only when the brief clearly asks for it (e.g. `build` + `deploy`).
 
-## Mission → pipeline
+`route.py` parses this file, so keep the format: a `### \`mission\`` heading, then `Signals:`, `Tags:`, and one slot table.
 
-### `build` — create or implement something
-1. `writing-plans` or `brief-to-tasks` (if multi-step) — skip interactive brainstorming approval; the pasted prompt IS the brief
-2. Domain skills (frontend/backend/cloud/docs as matched)
-3. `tdd` / `test-driven-development` when shipping code with testable behavior
-4. `verification-before-completion` before claiming done
-5. `requesting-code-review` for large code changes
+## How slots work
 
-### `fix` — bug, failure, unexpected behavior
-1. `systematic-debugging` first (mandatory)
-2. Domain skill for the stack
-3. `verification-before-completion`
+Each mission is a pipeline of **slots**, run top to bottom.
 
-### `design-ui` — visual UI / landing / redesign
-1. `design-taste-frontend` or `frontend-design`
-2. `ui-ux-pro-max` when interaction/IA matters
-3. `web-design-guidelines` / `accessibility` near the end if shipping UI
-4. Avoid stacking every design skill — max 3 design-family skills
+- **Candidates** are skill names or globs (`*deploy*`, `vercel:*`). Matching is exact, or by the part after `plugin:`. The first installed candidate fills the slot.
+- **Need**
+  - `required`: the slot must be filled. If no candidate is installed, do the step by hand and say so in one line (e.g. "no verification skill installed, ran `npm test` directly").
+  - `optional`: fill it when a candidate is installed and the brief is big enough to need it.
+  - `match`: fill it only with candidates whose name or description matches the brief (e.g. the `pdf` skill only when the brief asks for a PDF).
+- **Max**: how many skills the slot can hold.
+- `*` in Candidates means **domain skills**: the highest-scoring skills that match the brief, the mission tags or the repo stack.
 
-### `logo` — mascot / IP / character mark
-1. `ip-as-logo` only (do not dilute with generic design skills unless asked)
+---
 
-### `audit` — review / quality / security / a11y / perf
-1. Matching audit skill (`security-review`, `accessibility`, `web-quality-audit`, `web-design-guidelines`, `django-perf-review`, etc.)
-2. Produce findings first; fix only if the prompt asks to fix
+### `build`
+Create, implement, scaffold or add a feature.
+Signals: build, create, implement, scaffold, add, feature, make, develop, wire, integrate, generate, app, endpoint, page
+Tags: frontend, backend, data, ai, payments, testing
 
-### `research` — investigate / compare / gather facts
-1. `research`
-2. Optionally `find-skills` if capability gap appears mid-task
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| plan | optional | 1 | writing-plans, brief-to-tasks, superpowers:writing-plans |
+| docs | optional | 1 | docs-first-engineering, context7, *:docs-first* |
+| domain | match | 4 | * |
+| test | optional | 1 | test-driven-development, tdd, superpowers:test-driven-development |
+| verify | required | 1 | verification-before-completion, project-delivery-checks, superpowers:verification-before-completion, *:verification, run |
 
-### `docs` — documents / slides / spreadsheets
-1. Exact format skill: `docx` / `pdf` / `pptx` / `xlsx` / `slides`
-2. `writing-guidelines` for prose-heavy deliverables
+### `fix`
+A bug, failure, error or regression.
+Signals: bug, broken, error, failing, fails, fix, crash, regression, exception, traceback, 500, flaky, wrong, issue, debug, not working
+Tags: testing, backend, frontend, git
 
-### `deploy` — ship / preview / production deploy
-1. Matching deploy skill (`deploy-to-vercel`, azure deploy skills, etc.)
-2. `verification-before-completion`
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| debug | required | 1 | systematic-debugging, debugging, superpowers:systematic-debugging |
+| domain | match | 3 | * |
+| verify | required | 1 | verification-before-completion, project-delivery-checks, superpowers:verification-before-completion, *:verification, run |
 
-### `parallel` — 2+ independent workstreams in one prompt
-1. `dispatching-parallel-agents` or `subagent-driven-development`
-2. Split by domain; each stream gets its own skill set
+### `refactor`
+Restructure, clean up or simplify code without changing what it does.
+Signals: refactor, cleanup, clean up, simplify, restructure, rename, extract, dedupe, tech debt, modernize, upgrade, migrate
+Tags: process, frontend, backend, testing
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| plan | optional | 1 | writing-plans, superpowers:writing-plans |
+| domain | match | 3 | * |
+| review | optional | 1 | simplify, code-review, requesting-code-review |
+| verify | required | 1 | verification-before-completion, project-delivery-checks, *:verification, run |
+
+### `design-ui`
+Visual UI work: landing pages, redesigns, components, styling.
+Signals: landing, redesign, ui, ux, page, hero, layout, style, styling, theme, visual, frontend, component, beautiful, polish, dashboard
+Tags: frontend, design
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| design | required | 1 | design-taste-frontend, frontend-design, ui-ux-pro-max |
+| domain | match | 2 | * |
+| guidelines | optional | 1 | web-design-guidelines, accessibility, web-quality-audit |
+| verify | optional | 1 | run, *:verification, webapp-testing, project-delivery-checks |
+
+Cap: at most 3 design-family skills in total.
+
+### `logo`
+A logo, mascot, IP character or brand mark.
+Signals: logo, mascot, character, brand mark, icon, wordmark, emblem
+Tags: design
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| logo | required | 1 | ip-as-logo, logo-design, brand-identity, figma:figma-generate-design |
+
+A single skill is enough. Do not add generic design skills unless the brief asks for them.
+
+### `audit`
+Review code or a product: quality, security, a11y, performance. Produce findings first.
+Signals: review, audit, a11y, accessibility, security, vulnerability, threat, perf, performance, lighthouse, check, assess, inspect
+Tags: security, testing, frontend
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| audit | match | 3 | security-review, security-best-practices, security-threat-model, code-review, web-design-guidelines, accessibility, web-quality-audit, vercel:performance*, django-perf-review |
+| domain | match | 2 | * |
+
+Report findings first. Fix only if the brief asks for fixes.
+
+### `research`
+Investigate, compare or gather facts. The deliverable is an answer.
+Signals: research, compare, investigate, explore, find out, evaluate, which, versus, vs, options, pros, cons, survey
+Tags: research, docs
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| research | optional | 1 | research, deep-research, docs-first-engineering |
+| domain | match | 3 | * |
+
+### `docs`
+Produce a document: pdf, pptx, xlsx, docx, slides or long-form writing.
+Signals: pdf, pptx, xlsx, docx, slides, deck, spreadsheet, document, report, presentation, write-up, whitepaper, readme
+Tags: docs
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| format | match | 2 | docx, pdf, pptx, xlsx, slides, anthropic-skills:docx, anthropic-skills:pdf, anthropic-skills:pptx, anthropic-skills:xlsx, anthropic-skills:docs |
+| writing | optional | 1 | writing-guidelines, doc-coauthoring |
+| domain | match | 2 | * |
+
+### `deploy`
+Ship, preview, release or roll back.
+Signals: deploy, ship, release, preview, production, prod, rollback, publish, go live, hosting, domain, ci/cd
+Tags: deploy, cloud, git
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| deploy | match | 1 | deploy-to-vercel, vercel:deploy, vercel:deployments-cicd, *deploy*, *:vercel-cli |
+| domain | match | 2 | * |
+| verify | required | 1 | verification-before-completion, project-delivery-checks, *:verification, run |
+
+### `skill`
+Create or improve a skill, agent, plugin, hook, prompt or harness config.
+Signals: skill, skills, subagent, plugin, hook, hooks, system prompt, claude.md, agents.md, settings.json, mod, slash command, nummode
+Tags: skills, ai, process
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| author | required | 1 | skill-creator, anthropic-skills:skill-creator, writing-skills, superpowers:writing-skills, plugin-authoring, update-config |
+| domain | match | 2 | * |
+| verify | required | 1 | verification-before-completion, project-delivery-checks, *:verification |
+
+### `parallel`
+Two or more independent deliverables in one brief.
+Signals: parallel, in parallel, simultaneously, at the same time, independent streams, workstreams, separately
+Tags: process
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| dispatch | optional | 1 | dispatching-parallel-agents, subagent-driven-development, superpowers:dispatching-parallel-agents |
+| domain | match | 4 | * |
+
+Split streams by deliverable. Give each stream its own mission and skills. Only parallelize streams that share no files or state.
+
+---
 
 ## Conflict rules
 
 | Conflict | Winner |
 |---|---|
-| Interactive skill wants approval vs nummode autonomy | **nummode autonomy** — treat the user prompt as approved brief |
+| A skill wants interactive approval vs nummode autonomy | **nummode**: the brief is the approval; note the assumption in one line |
 | Process skill vs domain skill | Process decides *how*; domain decides *what* |
-| Multiple overlapping design skills | Keep the single best fit + one polish skill |
-| Plan-only vs ship | If prompt says "plan" / "spec only" → stop after plan; else ship |
+| Two skills do the same job | Keep the higher scorer; drop the other (−3) |
+| Several design skills | One best fit + one polish skill, never more than 3 |
+| "Plan only" / "spec only" vs ship | Stop after the plan when the brief says so; otherwise ship |
+| Skill says "only when explicitly asked" | Use it only when the brief names its topic |
 
-## Scoring (internal)
+## Scoring (what route.py computes)
 
-For each **installed** candidate skill, score 0–5:
-- +2 description keyword overlap with prompt nouns/verbs
-- +3 mission playbook includes it (playbook hits clear the bar alone)
-- +1 stack detected in repo/prompt (Next, Django, etc.)
-- −2 weak/generic match only
-- −3 duplicates another selected skill’s job
+Additive, per installed skill:
 
-Select up to **7** skills with score ≥ 3. Prefer installed playbook steps; if a playbook name is missing, use the nearest installed equivalent (or proceed with a one-line note) — never invent or fake-invoke a skill. Always include a finisher when producing code.
+| Signal | Points |
+|---|---:|
+| Named in the brief (`use supabase`) | +6 |
+| First installed candidate of a slot (`match` slots also need a keyword hit) | +4 |
+| Later candidate of a slot | +1 |
+| Skill name words appear in the brief | +2 each, max +4 |
+| Description words appear in the brief | +1 each, max +3 |
+| Tag is one of the mission's tags | +1 |
+| Repo stack matches (package.json / pyproject deps) | +2 |
+| Description says "only when explicitly asked" and the brief does not name it | −4 |
+| Duplicates a slot that a higher scorer already filled | dropped |
+
+Keep skills that score at least 3. Lock **1–7**, sized to the brief. Order them process → domain → finish. Never invent or fake-invoke a skill.
