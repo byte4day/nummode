@@ -1,3 +1,5 @@
+<p><img src="assets/icon.svg" alt="nummode routing monogram" width="72" height="72"></p>
+
 # nummode
 
 **Paste a big prompt. nummode picks the skills, does the work, and proves it works.**
