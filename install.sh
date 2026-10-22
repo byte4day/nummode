@@ -79,7 +79,7 @@ install_shared() {
 
   # Shipped playbooks only; user-added playbooks in ~/.nummode/playbooks are kept.
   cp "${ROOT}/nummode/playbooks/"*.md "${NUMMODE_HOME}/playbooks/"
-  cp "${ROOT}/nummode/scripts/refresh-index.py" "${ROOT}/nummode/scripts/route.py" "${NUMMODE_HOME}/scripts/"
+  cp "${ROOT}/nummode/scripts/refresh-index.py" "${ROOT}/nummode/scripts/route.py" "${ROOT}/nummode/scripts/relay.py" "${NUMMODE_HOME}/scripts/"
   rm -rf "${NUMMODE_HOME}/scripts/__pycache__"
   chmod +x "${NUMMODE_HOME}/scripts/"*.py || warn "chmod failed in ~/.nummode/scripts"
 

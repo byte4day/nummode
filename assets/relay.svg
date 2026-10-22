@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">nummode relay</title>
+  <desc id="desc">One orchestrator node routing work to three worker harnesses, with the active handoff highlighted.</desc>
+  <rect width="64" height="64" rx="14" fill="#111318"/>
+  <path d="M24 32H34V17H43M34 32V47H43" fill="none" stroke="#F2F3EF" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M24 32H43" fill="none" stroke="#D7E76D" stroke-width="4" stroke-linecap="square"/>
+  <rect x="11" y="25" width="14" height="14" fill="#F2F3EF"/>
+  <rect x="43" y="13" width="8" height="8" fill="#F2F3EF"/>
+  <rect x="43" y="28" width="8" height="8" fill="#D7E76D"/>
+  <rect x="43" y="43" width="8" height="8" fill="#F2F3EF"/>
+</svg>

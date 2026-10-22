@@ -26,7 +26,8 @@ nummode is the routing layer:
 4. **Invoke**: load each skill right before its step
 5. **Execute**: parallel only when streams share nothing
 6. **Verify**: real commands before "done"
-7. **Report**: what works, how to try it, one next action
+7. **Relay**: hand sub-tasks to other harnesses (Codex, Cursor, Claude Code, Antigravity, OpenCode) and read back their results
+8. **Report**: what works, how to try it, one next action
 
 The pasted brief is the approval. nummode never asks which skills to use.
 
@@ -56,7 +57,7 @@ Re-running is safe. Backups of anything replaced go to `~/.nummode/backups/`, ne
 
 | Target | Path |
 |---|---|
-| Shared data | `~/.nummode/`: playbooks, `scripts/route.py`, `scripts/refresh-index.py`, skill index, `VERSION`, `backups/` |
+| Shared data | `~/.nummode/`: playbooks, `scripts/route.py`, `scripts/relay.py`, `scripts/refresh-index.py`, skill index, `VERSION`, `backups/` |
 | Universal skill | `~/.agents/skills/nummode`, symlinked into each harness |
 | Claude agent | `~/.claude/agents/nummode.md`. Sets the default `agent` only when none is set |
 | Cursor agent | `~/.cursor/agents/nummode.md` |
@@ -102,6 +103,39 @@ harness: claude · index: fresh (66 skills, catalog=80ae5a1f090ad1f7)
 
 The router rebuilds the index automatically when skills change on disk. Manual: `python3 ~/.nummode/scripts/refresh-index.py` (`--check` exits 3 when stale).
 
+### Relay: other harnesses as workers
+
+<p><img src="assets/relay.svg" alt="nummode relay mark: one orchestrator routing to three workers" width="56" height="56"></p>
+
+nummode can launch **Claude Code, Codex, Cursor, Antigravity (Gemini CLI) and OpenCode** headless, hand each one a sub-task, and continue from what they save. One harness orchestrates; the others are workers, like subagents across vendors.
+
+```text
+you:      use nummode: research rate-limiting options with Codex, then implement the best one
+claude:   relay.py dispatch --to codex --task "Research … cite sources, recommend one"
+codex:    works headless → .relay/<id>/result.md
+claude:   relay.py wait → reads result.md → implements → runs the tests
+```
+
+```bash
+R=~/.nummode/scripts/relay.py
+python3 $R harnesses                                   # installed CLIs; marks the current session
+python3 $R dispatch --to codex  --name research --task "…"           # background, read-only
+python3 $R dispatch --to cursor --name ui-review --task "…" --context src/app.tsx
+python3 $R wait                                        # block until all finish
+python3 $R status                                      # done / failed / timeout / running
+python3 $R result <id>                                 # print result.md
+```
+
+| Mode | Claude Code | Codex | Cursor | Gemini / Antigravity | OpenCode |
+|---|---|---|---|---|---|
+| `read` (default) | read/search tools only | `-s read-only` | `--mode ask` | `--approval-mode default` | no `--auto` |
+| `write` | `acceptEdits` | `-s workspace-write` | `--force` | `auto_edit` | `--auto` |
+| `full` | skip permissions | no sandbox | `--force` | `yolo` | `--auto` |
+
+Each task folder holds `brief.md`, `prompt.txt`, `meta.json` (command, pids, status, exit code), `result.md`, `log.txt` and a `files/` dir. The relay root gets a `.gitignore` so handoffs never get committed. Workers cannot start workers (depth limit 1, `NUMMODE_RELAY_MAX_DEPTH`). Other options: `--mode`, `--model`, `--timeout`, `--cwd`, `--dir` / `NUMMODE_RELAY_DIR`, `--extra <raw-arg>`, `--wait`, `--dry-run`, `--json`. Override a binary with `NUMMODE_RELAY_<HARNESS>_BIN`.
+
+[Copycat](https://github.com/byte4day/Copycat) and [DevOps Agent](https://github.com/byte4day/devops-agent) ship the same `relay.py`, so they can delegate too.
+
 ---
 
 ## Missions
@@ -118,6 +152,7 @@ The router rebuilds the index automatically when skills change on disk. Manual: 
 | `docs` | pdf, pptx, xlsx, docx | matching format skill → writing |
 | `deploy` | ship, release, preview | deploy → **verify** |
 | `skill` | skills, agents, hooks, CLAUDE.md | **author** → domain → **verify** |
+| `relay` | "research it with Codex, then build", delegate to, hand off | dispatch to other harnesses → read results → domain |
 | `parallel` | independent workstreams | dispatch → per-stream skills |
 
 **Bold** = required slot. When no installed skill fills a required slot, the agent does that step by hand and says so. Slots and candidates live in [`missions.md`](nummode/playbooks/missions.md). Edit the tables to change routing; the router parses them directly.
@@ -150,7 +185,7 @@ install.sh update.sh uninstall.sh VERSION CHANGELOG.md
 ```
 
 ```bash
-bash scripts/check-sync.sh && python3 tests/test_refresh_index.py && python3 tests/test_route.py && bash tests/test_install.sh
+bash scripts/check-sync.sh && python3 tests/test_refresh_index.py && python3 tests/test_route.py && python3 tests/test_relay.py && bash tests/test_install.sh
 ```
 
 ---

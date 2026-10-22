@@ -37,5 +37,7 @@ jobs:
         run: python3 tests/test_refresh_index.py
       - name: Router tests
         run: python3 tests/test_route.py
+      - name: Relay tests
+        run: python3 tests/test_relay.py
       - name: Installer smoke test (temp HOME)
         run: bash tests/test_install.sh

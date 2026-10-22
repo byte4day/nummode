@@ -17,6 +17,7 @@ check() {
 
 check nummode/scripts/refresh-index.py skills/nummode/scripts/refresh-index.py
 check nummode/scripts/route.py skills/nummode/scripts/route.py
+check nummode/scripts/relay.py skills/nummode/scripts/relay.py
 check nummode/playbooks/missions.md skills/nummode/references/missions.md
 check nummode/playbooks/intake.md skills/nummode/references/intake.md
 

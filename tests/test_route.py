@@ -59,7 +59,7 @@ def plan(brief, **kw):
 
 
 class MissionsFileTests(unittest.TestCase):
-    EXPECTED = {"build", "fix", "refactor", "design-ui", "logo", "audit", "research", "docs", "deploy", "skill", "parallel"}
+    EXPECTED = {"build", "fix", "refactor", "design-ui", "logo", "audit", "research", "docs", "deploy", "skill", "relay", "parallel"}
 
     def test_all_missions_parse_with_signals_tags_slots(self):
         self.assertEqual(set(MISSIONS), self.EXPECTED)

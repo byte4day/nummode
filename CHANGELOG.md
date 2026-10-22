@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0 — 2026-10-22
+
+### Added
+- **Relay (`relay.py`)**: the orchestrating agent can launch Claude Code, Codex, Cursor, Antigravity (via Gemini CLI) and OpenCode headless, give each a sub-task, and continue from the saved `.relay/<id>/result.md`. Commands: `harnesses`, `dispatch`, `status`, `wait`, `result`, `cancel`. Modes `read` (default) / `write` / `full` map to each CLI's own sandbox and approval flags. Background by default, `--wait` for foreground. Recursion guard (workers cannot start workers), timeouts, `.gitignore` in the relay root. Standard library only.
+- **`relay` mission** in the router, with signals such as "with codex", "delegate to", "hand off".
+- Tests: `tests/test_relay.py` (11, fake harness binaries).
+
+### Changed
+- Saying "use nummode to …" no longer forces the `skill` mission; only "update/improve/fix nummode" does.
+
 ## 2.0.0 — 2026-10-11
 
 ### Added

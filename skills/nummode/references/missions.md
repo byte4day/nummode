@@ -125,7 +125,7 @@ Tags: deploy, cloud, git
 
 ### `skill`
 Create or improve a skill, agent, plugin, hook, prompt or harness config.
-Signals: skill, skills, subagent, plugin, hook, hooks, system prompt, claude.md, agents.md, settings.json, mod, slash command, nummode
+Signals: skill, skills, subagent, plugin, hook, hooks, system prompt, claude.md, agents.md, settings.json, mod, slash command, update nummode, improve nummode, fix nummode
 Tags: skills, ai, process
 
 | Slot | Need | Max | Candidates |
@@ -145,6 +145,17 @@ Tags: process
 | domain | match | 4 | * |
 
 Split streams by deliverable. Give each stream its own mission and skills. Only parallelize streams that share no files or state.
+
+### `relay`
+Hand parts of the brief to other agent harnesses (Claude Code, Codex, Cursor, Antigravity/Gemini, OpenCode) and continue from their saved results.
+Signals: relay, delegate to, hand off, handoff, another harness, other harness, cross-harness, worker agent, ask codex, use codex, ask cursor, use cursor, ask gemini, use gemini, use antigravity, ask antigravity, use opencode, ask claude, with codex, with cursor, with gemini, with antigravity, with opencode, in codex, in cursor, in antigravity, open codex, open cursor, launch codex, launch cursor
+Tags: process
+
+| Slot | Need | Max | Candidates |
+|---|---|---|---|
+| domain | match | 4 | * |
+
+Run `python3 ~/.nummode/scripts/relay.py harnesses`, dispatch each self-contained sub-task with `relay.py dispatch --to <harness> --task "…"` (default `--mode read`; `--mode write` only for disjoint files), `relay.py wait`, then read every `.relay/<id>/result.md` before continuing. Verify worker output like any other evidence.
 
 ---
 

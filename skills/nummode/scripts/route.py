@@ -195,7 +195,7 @@ def detect_stack(repo: Path) -> set[str]:
 def detect_missions(brief: str, missions: dict[str, Mission]) -> list[tuple[str, int, list[str]]]:
     text = brief.lower()
     # Tie-break order. deploy/parallel lose ties: "build X and deploy it" is a build with a deploy tail.
-    priority = ["fix", "logo", "docs", "audit", "refactor", "skill", "design-ui", "research", "build", "deploy", "parallel"]
+    priority = ["fix", "logo", "docs", "audit", "refactor", "skill", "design-ui", "research", "build", "deploy", "relay", "parallel"]
     order = {name: i for i, name in enumerate(priority)}
     scored = []
     for m in missions.values():
