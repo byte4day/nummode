@@ -87,10 +87,13 @@ install_shared() {
   if [[ -L "${skill}" ]]; then
     rm "${skill}"
   fi
-  mkdir -p "${skill}/references" "${skill}/scripts"
+  mkdir -p "${skill}/references" "${skill}/scripts" "${skill}/agents"
   cp "${ROOT}/skills/nummode/SKILL.md" "${skill}/SKILL.md"
   cp "${ROOT}/skills/nummode/references/"*.md "${skill}/references/"
   cp "${ROOT}/skills/nummode/scripts/"*.py "${skill}/scripts/"
+  if [[ -f "${ROOT}/skills/nummode/agents/openai.yaml" ]]; then
+    cp "${ROOT}/skills/nummode/agents/openai.yaml" "${skill}/agents/openai.yaml"
+  fi
   rm -rf "${skill}/scripts/__pycache__"
   chmod +x "${skill}/scripts/"*.py || warn "chmod failed in ${skill}/scripts"
   printf '%s\n' "${VERSION}" > "${skill}/VERSION"
@@ -168,17 +171,28 @@ PY
 
 install_cursor() {
   echo "Installing Cursor…"
-  mkdir -p "${HOME}/.cursor/agents" "${HOME}/.cursor/skills"
+  # Cursor discovers ~/.agents/skills (canonical). Do not also link into
+  # ~/.cursor/skills — that duplicates the skill in the host catalog.
+  mkdir -p "${HOME}/.cursor/agents"
   cp "${ROOT}/agents/cursor/nummode.md" "${HOME}/.cursor/agents/nummode.md"
-  link_skill "${HOME}/.cursor/skills"
+  if [[ -L "${HOME}/.cursor/skills/nummode" ]]; then
+    rm -f "${HOME}/.cursor/skills/nummode"
+    echo "  removed duplicate ~/.cursor/skills/nummode symlink"
+  fi
   echo "  agent → ~/.cursor/agents/nummode.md"
+  echo "  skill via ~/.agents/skills/nummode (Cursor reads this root)"
 }
 
 install_codex() {
   echo "Installing Codex…"
-  mkdir -p "${HOME}/.codex/agents" "${HOME}/.codex/skills"
+  # Codex discovers ~/.agents/skills (canonical). Do not also link into
+  # ~/.codex/skills — current Codex docs no longer list that path as primary.
+  mkdir -p "${HOME}/.codex/agents"
   cp "${ROOT}/agents/codex/nummode.toml" "${HOME}/.codex/agents/nummode.toml"
-  link_skill "${HOME}/.codex/skills"
+  if [[ -L "${HOME}/.codex/skills/nummode" ]]; then
+    rm -f "${HOME}/.codex/skills/nummode"
+    echo "  removed duplicate ~/.codex/skills/nummode symlink"
+  fi
 
   FORCE_MULTI_AGENT="${FORCE_MULTI_AGENT}" python3 - <<'PY'
 import os

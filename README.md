@@ -4,7 +4,7 @@
 
 **Paste a big prompt. nummode picks the skills, does the work, and proves it works.**
 
-Runs on **Claude Code**, **Cursor** and **Codex**. Also indexes **Gemini / Antigravity** skill roots and enabled **Claude Code plugin** skills.
+Runs on **Claude Code**, **Cursor**, **Codex**, and **OpenCode**. Also indexes **Gemini / Antigravity** skill roots and enabled **Claude Code plugin** skills. Packaging follows the open [Agent Skills](https://agentskills.io/) standard.
 
 ```text
 you:      [1200-word product brief]
@@ -58,7 +58,7 @@ Re-running is safe. Backups of anything replaced go to `~/.nummode/backups/`, ne
 | Target | Path |
 |---|---|
 | Shared data | `~/.nummode/`: playbooks, `scripts/route.py`, `scripts/relay.py`, `scripts/refresh-index.py`, skill index, `VERSION`, `backups/` |
-| Universal skill | `~/.agents/skills/nummode`, symlinked into each harness |
+| Universal skill | `~/.agents/skills/nummode` (Cursor + Codex read this). Symlinked to `~/.claude/skills/nummode` only |
 | Claude agent | `~/.claude/agents/nummode.md`. Sets the default `agent` only when none is set |
 | Cursor agent | `~/.cursor/agents/nummode.md` |
 | Codex role | `~/.codex/agents/nummode.toml`. Enables `features.multi_agent` when it is missing |
@@ -135,6 +135,20 @@ python3 $R result <id>                                 # print result.md
 Each task folder holds `brief.md`, `prompt.txt`, `meta.json` (command, pids, status, exit code), `result.md`, `log.txt` and a `files/` dir. The relay root gets a `.gitignore` so handoffs never get committed. Workers cannot start workers (depth limit 1, `NUMMODE_RELAY_MAX_DEPTH`). Other options: `--mode`, `--model`, `--timeout`, `--cwd`, `--dir` / `NUMMODE_RELAY_DIR`, `--extra <raw-arg>`, `--wait`, `--dry-run`, `--json`. Override a binary with `NUMMODE_RELAY_<HARNESS>_BIN`.
 
 [Copycat](https://github.com/byte4day/Copycat) and [DevOps Agent](https://github.com/byte4day/devops-agent) ship the same `relay.py`, so they can delegate too.
+
+Prefer **native** Task / Agent / subagents when the worker is the same harness. Use relay when you need another vendor, a second opinion, or true CLI isolation.
+
+### Models (Nov 2026)
+
+nummode itself uses **`model: inherit`** / the host default. When a brief or worker needs an explicit pin, use current IDs only:
+
+| Provider | Prefer | Specialist |
+|---|---|---|
+| Anthropic / Claude Code | `claude-opus-5-5` or aliases `opus` / `sonnet` / `haiku` / `fable` | `claude-fable-5-2` for long-horizon hard agentic work |
+| OpenAI / Codex | host default; Astra for hardest end-to-end | `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (plan-dependent) |
+| Cursor | `inherit` | whatever the Cursor picker exposes |
+
+Details and skill-authoring rules (short descriptions, progressive disclosure): `skills/nummode/references/models-and-harness.md`.
 
 ---
 

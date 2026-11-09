@@ -1,0 +1,8 @@
+interface:
+  display_name: "nummode"
+  short_description: "Route skills for big briefs and ship with verification"
+  brand_color: "#22D3EE"
+  default_prompt: "Use nummode on this brief."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.0 — 2026-11-10
+
+### Added
+- **`references/models-and-harness.md`**: current Claude / OpenAI / Cursor model guidance (Nov 2026), Agent Skills packaging paths, and short-description authoring rules.
+- Skill-authoring defaults in `SKILL.md` for mission `skill` (Agent Skills shape, progressive disclosure, prefer native Task/Agent over same-host relay).
+
+### Changed
+- Shortened the skill `description` so hosts that truncate skill catalogs keep the trigger words.
+- Relay guidance: prefer same-host Agent/Task; pin `--model` only to IDs the worker CLI documents.
+- Agent blurbs mention Claude alias `fable` and current GPT-6 / Claude 5.5 lines without hard-requiring them.
+- Installer keeps one canonical skill at `~/.agents/skills/nummode`, links only into `~/.claude/skills`, and removes duplicate Cursor/Codex skill symlinks (those hosts already read `~/.agents/skills`).
+- Installer also ships optional Codex UI metadata at `agents/openai.yaml`.
+
 ## 2.1.0 — 2026-10-22
 
 ### Added

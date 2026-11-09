@@ -128,6 +128,8 @@ Create or improve a skill, agent, plugin, hook, prompt or harness config.
 Signals: skill, skills, subagent, plugin, hook, hooks, system prompt, claude.md, agents.md, settings.json, mod, slash command, update nummode, improve nummode, fix nummode
 Tags: skills, ai, process
 
+Follow [Agent Skills](https://agentskills.io/): short trigger-specific `description`, root `SKILL.md` as a router, detail in `references/`, prefer `model: inherit` / documented aliases (`fable`/`opus`/`sonnet`/`haiku`). See `models-and-harness.md`.
+
 | Slot | Need | Max | Candidates |
 |---|---|---|---|
 | author | required | 1 | skill-creator, anthropic-skills:skill-creator, writing-skills, superpowers:writing-skills, plugin-authoring, update-config |
