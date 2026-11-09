@@ -43,7 +43,9 @@ GENERIC_STACK = {"node", "github", "python", "docker"}
 
 HARNESS_SOURCES = {
     "claude": ("claude", "plugin:"),
-    "cursor": ("cursor", "agents"),
+    # Cursor loads ~/.agents, ~/.cursor, and (compat) ~/.claude + ~/.codex skill roots.
+    # https://cursor.com/docs/skills
+    "cursor": ("cursor", "agents", "claude", "codex"),
     "codex": ("codex", "agents"),
     "gemini": ("gemini", "antigravity", "agents"),
 }

@@ -158,6 +158,9 @@ class RouteTests(unittest.TestCase):
         self.assertNotIn("cursor-only", self.names("frontend react ui design work", harness="claude"))
         self.assertIn("vercel:deploy", self.names("deploy to vercel production", harness="claude"))
         self.assertNotIn("vercel:deploy", self.names("deploy to vercel production", harness="codex"))
+        # Cursor also loads Claude/Codex skill directories (compat).
+        self.assertIn("systematic-debugging", self.names("fix the crash", harness="cursor"))
+        self.assertIn("cursor-only", self.names("frontend react ui design work", harness="cursor"))
 
     def test_gap_reported_when_required_slot_empty(self):
         idx = [s for s in INDEX if s["name"] != "verification-before-completion"]
@@ -207,6 +210,10 @@ class CliTests(unittest.TestCase):
             d.mkdir(parents=True)
             (d / "SKILL.md").write_text("---\nname: systematic-debugging\ndescription: Debug bugs and failures.\n---\n")
             env = {**os.environ, "HOME": str(home), "NUMMODE_HOME": str(home / ".nummode"), "NUMMODE_EXTRA_ROOTS": ""}
+            # Parent Cursor/Claude/Codex sessions leak harness env; isolate the fake $HOME.
+            for k in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_HOME", "CODEX_SANDBOX",
+                      "CURSOR_TRACE_ID", "CURSOR_AGENT"):
+                env.pop(k, None)
             out = subprocess.run([sys.executable, str(SCRIPT), "--json", "--harness", "any", "--repo", tmp,
                                   "the build is failing, fix it"], capture_output=True, text=True, env=env, check=True)
             data = json.loads(out.stdout)
@@ -214,10 +221,14 @@ class CliTests(unittest.TestCase):
             self.assertEqual(data["skills"][0]["name"], "systematic-debugging")
             self.assertIn("verify", data["gaps"])
             self.assertTrue((home / ".nummode" / "skill-index.json").is_file())
-            # stdin + text mode
+            # stdin + text mode (auto harness). Also prove Cursor sessions still see ~/.claude skills.
             out = subprocess.run([sys.executable, str(SCRIPT), "-"], input="fix the crash", capture_output=True,
                                  text=True, env=env, check=True)
-            self.assertTrue(out.stdout.startswith("nummode · fix · skills: systematic-debugging"))
+            self.assertTrue(out.stdout.startswith("nummode · fix · skills: systematic-debugging"), out.stdout)
+            env_cursor = {**env, "CURSOR_AGENT": "1"}
+            out = subprocess.run([sys.executable, str(SCRIPT), "-"], input="fix the crash", capture_output=True,
+                                 text=True, env=env_cursor, check=True)
+            self.assertTrue(out.stdout.startswith("nummode · fix · skills: systematic-debugging"), out.stdout)
 
     def test_empty_brief_errors(self):
         out = subprocess.run([sys.executable, str(SCRIPT), "  "], capture_output=True, text=True,

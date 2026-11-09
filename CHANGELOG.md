@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1 — 2026-11-10
+
+### Fixed
+- **Cursor harness filter** now includes `claude` and `codex` skill roots. Cursor loads those directories for compatibility ([docs](https://cursor.com/docs/skills)), so routing inside a Cursor session no longer drops skills that only live under `~/.claude/skills`.
+- CLI router tests clear leaked `CURSOR_AGENT` / Claude / Codex env vars and assert the Cursor path still finds Claude-installed skills.
+
 ## 2.2.0 — 2026-11-10
 
 ### Added

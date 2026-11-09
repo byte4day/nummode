@@ -21,7 +21,7 @@ Skills follow the open [Agent Skills](https://agentskills.io/) format: a folder 
 |---|---|---|---|
 | Claude Code | `~/.claude/skills/<name>/` | `.claude/skills/<name>/` | [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills) |
 | Codex | `~/.agents/skills/<name>/` | `.agents/skills/` (cwd → repo root) | [learn.chatgpt.com/docs/build-skills](https://learn.chatgpt.com/docs/build-skills) |
-| Cursor | `~/.agents/skills/`, `~/.cursor/skills/` | `.agents/skills/`, `.cursor/skills/` | [cursor.com/docs/skills](https://cursor.com/docs/skills) |
+| Cursor | `~/.agents/skills/`, `~/.cursor/skills/` (also `~/.claude/skills/`, `~/.codex/skills/`) | `.agents/skills/`, `.cursor/skills/` (also `.claude/skills/`, `.codex/skills/`) | [cursor.com/docs/skills](https://cursor.com/docs/skills) |
 | Antigravity / Gemini | `~/.gemini/config/skills/` (legacy antigravity paths still scanned) | `.agents/skills/` | host docs |
 | OpenCode | follow that CLI's skill roots | project `.agents/skills/` when supported | host docs |
 
