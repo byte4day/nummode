@@ -15,6 +15,11 @@ Each mission is a pipeline of **slots**, run top to bottom.
   - `match`: fill it only with candidates whose name or description matches the brief (e.g. the `pdf` skill only when the brief asks for a PDF).
 - **Max**: how many skills the slot can hold.
 - `*` in Candidates means **domain skills**: the highest-scoring skills that match the brief, the mission tags or the repo stack.
+- A **secondary** mission adds its slots as optional: only the primary mission's required slots report a gap.
+
+## Streams
+
+When a brief holds two or more deliverables ("update A, also build B, and one more thing: C"), `route.py` prints a `streams:` block: one line per deliverable with its own mission and skills. Treat each line as a separate brief. Run streams in parallel only when they share no files or state; otherwise run them in order. `--no-streams` turns the split off.
 
 ---
 
@@ -56,7 +61,7 @@ Tags: process, frontend, backend, testing
 
 ### `design-ui`
 Visual UI work: landing pages, redesigns, components, styling.
-Signals: landing, redesign, ui, ux, page, hero, layout, style, styling, theme, visual, frontend, component, beautiful, polish, dashboard
+Signals: landing, redesign, ui, ux, page, hero, layout, style, styling, theme, visual, frontend, component, beautiful, polish, dashboard, animation, animated, svg, 3d
 Tags: frontend, design
 
 | Slot | Need | Max | Candidates |
@@ -93,13 +98,16 @@ Report findings first. Fix only if the brief asks for fixes.
 
 ### `research`
 Investigate, compare or gather facts. The deliverable is an answer.
-Signals: research, compare, investigate, explore, find out, evaluate, which, versus, vs, options, pros, cons, survey
+Signals: research, deep research, compare, investigate, explore, find out, evaluate, which, versus, vs, options, pros, cons, survey, sources, cite, citation, fact-check, literature, state of the art, look up
 Tags: research, docs
 
 | Slot | Need | Max | Candidates |
 |---|---|---|---|
-| research | optional | 1 | research, deep-research, docs-first-engineering |
+| research | required | 1 | deep-research, research, anthropic-skills:deep-research, docs-first-engineering |
+| reach | optional | 1 | agent-reach |
 | domain | match | 3 | * |
+
+Every claim in the answer carries a source. Check the claims the conclusion rests on against a primary source, and say what could not be confirmed.
 
 ### `docs`
 Produce a document: pdf, pptx, xlsx, docx, slides or long-form writing.
@@ -178,11 +186,11 @@ Additive, per installed skill:
 
 | Signal | Points |
 |---|---:|
-| Named in the brief (`use supabase`) | +6 |
+| Named in the brief (`use supabase`; `copy cat` also matches `copycat`) | +6 |
 | First installed candidate of a slot (`match` slots also need a keyword hit) | +4 |
 | Later candidate of a slot | +1 |
 | Skill name words appear in the brief | +2 each, max +4 |
-| Description words appear in the brief | +1 each, max +3 |
+| Description words appear in the brief (two or more; filler verbs such as create/update/fix never count) | +1 each, max +3 |
 | Tag is one of the mission's tags | +1 |
 | Repo stack matches (package.json / pyproject deps) | +2 |
 | Description says "only when explicitly asked" and the brief does not name it | −4 |

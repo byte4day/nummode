@@ -92,9 +92,19 @@ mission: build (signals: build) · secondary: deploy
 harness: claude · index: fresh (66 skills, catalog=80ae5a1f090ad1f7)
 ```
 
+A brief with several deliverables also gets a `streams:` block, so each one can be briefed and routed on its own:
+
+```text
+streams: 3 deliverables. Brief each on its own; run in parallel only when they share no files.
+  1. skill            update my copycat skill and its agent  →  anthropic-skills:skill-creator, copycat
+  2. research         do deep research on vector databases  →  deep-research
+  3. design-ui        redesign the landing page hero with an svg animation  →  frontend-design
+```
+
 | Option | Effect |
 |---|---|
 | `--file brief.md` / `-` | Read the brief from a file or stdin |
+| `--no-streams` | Do not split the brief into deliverables |
 | `--mission audit` | Force a mission |
 | `--harness claude\|cursor\|codex\|gemini\|any` | Only skills that harness can load. Auto-detected |
 | `--repo PATH` | Read stack hints (package.json, pyproject, vercel.json…) from PATH. Default: cwd |
@@ -131,6 +141,8 @@ python3 $R result <id>                                 # print result.md
 | `read` (default) | read/search tools only | `-s read-only` | `--mode ask` | `--approval-mode default` | no `--auto` |
 | `write` | `acceptEdits` | `-s workspace-write` | `--force` | `auto_edit` | `--auto` |
 | `full` | skip permissions | no sandbox | `--force` | `yolo` | `--auto` |
+
+Send one question to several harnesses with `--to codex,claude`, see why a task failed in the `why:` line of `relay.py wait`, and clear finished handoffs with `relay.py clean --all`.
 
 Each task folder holds `brief.md`, `prompt.txt`, `meta.json` (command, pids, status, exit code), `result.md`, `log.txt` and a `files/` dir. The relay root gets a `.gitignore` so handoffs never get committed. Workers cannot start workers (depth limit 1, `NUMMODE_RELAY_MAX_DEPTH`). Other options: `--mode`, `--model`, `--timeout`, `--cwd`, `--dir` / `NUMMODE_RELAY_DIR`, `--extra <raw-arg>`, `--wait`, `--dry-run`, `--json`. Override a binary with `NUMMODE_RELAY_<HARNESS>_BIN`.
 

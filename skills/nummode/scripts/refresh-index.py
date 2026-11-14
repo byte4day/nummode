@@ -186,6 +186,36 @@ def _plugin_skill_files() -> list[tuple[str, str, Path]]:
     return out
 
 
+def _synced_skill_files() -> list[Path]:
+    """SKILL.md files of the claude.ai skills Claude Code synced most recently.
+
+    ~/.claude/skills/synced/<bucket>/ holds one folder per account; Claude Code lists
+    the skills of the active one as `anthropic-skills:<name>`. The newest manifest wins.
+    """
+    base = Path.home() / ".claude" / "skills" / "synced"
+    best: tuple[float, Path] | None = None
+    try:
+        buckets = [b for b in base.iterdir() if b.is_dir() and not b.name.startswith(".")]
+    except OSError:
+        return []
+    for bucket in buckets:
+        manifest = bucket / "manifest.json"
+        try:
+            stamp = float(json.loads(manifest.read_text()).get("lastUpdated") or 0) / 1000
+        except (OSError, ValueError, TypeError, AttributeError):
+            stamp = 0.0
+        if not stamp:
+            try:
+                stamp = bucket.stat().st_mtime
+            except OSError:
+                continue
+        if best is None or stamp > best[0]:
+            best = (stamp, bucket)
+    if best is None:
+        return []
+    return [f for f in sorted(best[1].glob("*/SKILL.md")) if not _is_skippable(f, best[1])]
+
+
 def collect_skills() -> tuple[list[dict], list[str]]:
     seen: dict[str, dict] = {}
     collisions: list[str] = []
@@ -219,6 +249,9 @@ def collect_skills() -> tuple[list[dict], list[str]]:
 
     for plugin, label, skill_md in _plugin_skill_files():
         consider(skill_md, label, prefix=plugin)
+
+    for skill_md in _synced_skill_files():
+        consider(skill_md, "synced", prefix="anthropic-skills")
 
     return sorted(seen.values(), key=lambda r: r["name"]), collisions
 
@@ -272,7 +305,7 @@ def render_markdown(rows: list[dict], collisions: list[str], generated: str, cha
         "Rebuild manually: `python3 ~/.nummode/scripts/refresh-index.py` · check: `--check`",
         "",
         "`found_in` = where the skill lives. A harness can only invoke skills it loads:",
-        "Claude Code → claude, plugin:*; Cursor → cursor, agents, claude, codex;",
+        "Claude Code → claude, plugin:*, synced (claude.ai skills); Cursor → cursor, agents, claude, codex;",
         "Codex → codex, agents; Gemini/Antigravity → gemini, antigravity, agents.",
         "",
         "## By tag",

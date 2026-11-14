@@ -38,17 +38,47 @@ skill skills guidance expert help helps task tasks work working code best practi
 tool tools user users trigger triggers file files when doing asked asks any including covers based
 """.split())
 
+# Verbs and filler that appear in almost every brief and every description. They never
+# count as a description hit (a skill NAME containing one still counts).
+WEAK_WORDS = set("""
+add build change create edit feature fix improve make run support text update write app project
+style agent better proper cool thing
+""".split())
+
+# Skills that ship inside Claude Code itself. They have no SKILL.md on disk, so the
+# index cannot see them; the router adds them when the harness is Claude Code.
+CLAUDE_BUILTINS = [
+    ("code-review", "Review the current diff or a PR for correctness bugs.", ["process"]),
+    ("simplify", "Review changed code for reuse and simplification, then apply the cleanups.", ["process"]),
+    ("security-review", "Security review of the pending changes on the current branch.", ["security"]),
+    ("run", "Launch and drive this project's app to confirm a change works.", ["testing"]),
+    ("update-config", "Configure the Claude Code harness: settings.json, hooks, permissions, env.", ["skills"]),
+    ("plugin-authoring", "Make or change a Claude Code mod: theme, panel, status line, slash command, hook.", ["skills"]),
+    ("claude-api", "Reference for the Claude API and Anthropic SDK: model ids, tool use, caching.", ["ai"]),
+]
+
 # Present in most repos; never a reason to pick a skill on their own.
 GENERIC_STACK = {"node", "github", "python", "docker"}
 
 HARNESS_SOURCES = {
-    "claude": ("claude", "plugin:"),
+    "claude": ("claude", "plugin:", "synced", "builtin:claude"),
     # Cursor loads ~/.agents, ~/.cursor, and (compat) ~/.claude + ~/.codex skill roots.
     # https://cursor.com/docs/skills
     "cursor": ("cursor", "agents", "claude", "codex"),
     "codex": ("codex", "agents"),
     "gemini": ("gemini", "antigravity", "agents"),
 }
+
+# A brief that names an installed skill and asks to change it is skill work,
+# whatever other verbs it uses ("update my copycat skill and add features").
+AUTHOR_VERB_RE = re.compile(r"\b(update|improve|upgrade|fix|rewrite|edit|extend|overhaul|refresh)\b")
+AUTHOR_NOUN_RE = re.compile(r"\b(skills?|agents?|subagents?|plugins?)\b")
+
+STREAM_SPLIT_RE = re.compile(
+    r"(?:\n\s*(?:[-*•]|\d+[.)])\s+|\n{2,}|[.;!?]\s+|"
+    r"\b(?:and also|also|one more thing\w*|additionally|after that|and then|finally|lastly)\b)", re.I)
+STREAM_MIN_WORDS = 4
+MAX_STREAMS = 6
 
 EXPLICIT_ONLY_RE = re.compile(
     r"(trigger|use) only when (the )?user (explicitly )?(asks|requests)|only when the user explicitly|"
@@ -97,6 +127,26 @@ def has_phrase(text: str, phrase: str) -> bool:
         return False
     # Whole words, allowing plural / -ing / -ed: "check" matches "checks" but never "checkout".
     return re.search(rf"(?<![a-z0-9]){re.escape(phrase)}(?:s|es|ed|ing)?(?![a-z0-9])", text) is not None
+
+
+def joined_words(text: str) -> set[str]:
+    """Adjacent words glued together, so "copy cat" can meet a skill named copycat."""
+    words = re.findall(r"[a-z0-9]+", text)
+    return {a + b for a, b in zip(words, words[1:])} | {a + b + c for a, b, c in zip(words, words[1:], words[2:])}
+
+
+def is_named(name: str, brief_text: str, joined: set[str] | None = None) -> bool:
+    name = name.lower()
+    basename = name.split(":", 1)[-1]
+    if has_phrase(brief_text, name):
+        return True
+    if len(basename) >= 6 or "-" in basename:
+        if has_phrase(brief_text, basename) or has_phrase(brief_text, basename.replace("-", " ")):
+            return True
+        flat = re.sub(r"[^a-z0-9]", "", basename)
+        if len(flat) >= 6 and joined and flat in joined:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------- missions.md
@@ -194,7 +244,8 @@ def detect_stack(repo: Path) -> set[str]:
 
 # ---------------------------------------------------------------- routing
 
-def detect_missions(brief: str, missions: dict[str, Mission]) -> list[tuple[str, int, list[str]]]:
+def detect_missions(brief: str, missions: dict[str, Mission],
+                    bonus: dict[str, tuple[int, str]] | None = None) -> list[tuple[str, int, list[str]]]:
     text = brief.lower()
     # Tie-break order. deploy/parallel lose ties: "build X and deploy it" is a build with a deploy tail.
     priority = ["fix", "logo", "docs", "audit", "refactor", "skill", "design-ui", "research", "build", "deploy", "relay", "parallel"]
@@ -202,8 +253,9 @@ def detect_missions(brief: str, missions: dict[str, Mission]) -> list[tuple[str,
     scored = []
     for m in missions.values():
         hits = [s for s in m.signals if has_phrase(text, s)]
-        if hits:
-            scored.append((m.name, len(hits), hits))
+        extra, why = (bonus or {}).get(m.name, (0, ""))
+        if hits or extra:
+            scored.append((m.name, len(hits) + extra, hits + ([why] if extra else [])))
     scored.sort(key=lambda x: (-x[1], order.get(x[0], 99)))
     return scored
 
@@ -221,22 +273,21 @@ def harness_ok(skill: dict, harness: str) -> bool:
     return any(src == a or (a.endswith(":") and src.startswith(a)) for src in skill["found_in"] for a in allowed)
 
 
-def base_score(skill: dict, brief_text: str, brief_toks: set[str], mission: Mission, stack: set[str]) -> tuple[int, list[str], int]:
+def base_score(skill: dict, brief_text: str, brief_toks: set[str], mission: Mission, stack: set[str],
+               joined: set[str] | None = None) -> tuple[int, list[str], int]:
     """Returns (score, reasons, keyword_points)."""
     name = skill["name"].lower()
     basename = name.split(":", 1)[-1]
     reasons: list[str] = []
     score = 0
 
-    explicit = has_phrase(brief_text, name) or (
-        (len(basename) >= 6 or "-" in basename) and
-        (has_phrase(brief_text, basename) or has_phrase(brief_text, basename.replace("-", " "))))
+    explicit = is_named(name, brief_text, joined)
     if explicit:
         score += 6
         reasons.append("named in brief")
 
     name_toks = tokens(basename)
-    desc_toks = tokens(skill.get("desc", "")) - name_toks
+    desc_toks = tokens(skill.get("desc", "")) - name_toks - WEAK_WORDS
     name_hits = sorted(name_toks & brief_toks)
     desc_hits = sorted(desc_toks & brief_toks)
     # One shared description word is noise ("review", "report"); two or more is signal.
@@ -273,17 +324,23 @@ def merged_slots(primary: Mission, secondaries: list[Mission]) -> list[Slot]:
     for sec in secondaries:
         for s in sec.slots:
             if s.name not in names and s.candidates != ["*"]:
-                slots.append(s)
+                # A secondary mission never produces a gap: only the primary's required slots do.
+                slots.append(Slot(s.name, "optional" if s.need == "required" else s.need, s.max, s.candidates))
                 names.add(s.name)
     return slots + tail
 
 
 def route(brief: str, *, index: list[dict], missions: dict[str, Mission], mission: str | None = None,
-          harness: str = "any", repo: Path | None = None, limit: int = MAX_SKILLS) -> dict:
+          harness: str = "any", repo: Path | None = None, limit: int = MAX_SKILLS, streams: bool = True) -> dict:
     brief_text = brief.lower()
     brief_toks = tokens(brief)
+    joined = joined_words(brief_text)
     word_count = len(brief.split())
-    detected = detect_missions(brief, missions)
+    bonus = {}
+    if "skill" in missions and AUTHOR_VERB_RE.search(brief_text) and AUTHOR_NOUN_RE.search(brief_text) \
+            and any(is_named(s["name"], brief_text, joined) for s in index):
+        bonus["skill"] = (2, "names an installed skill")
+    detected = detect_missions(brief, missions, bonus)
 
     if mission:
         if mission not in missions:
@@ -301,7 +358,7 @@ def route(brief: str, *, index: list[dict], missions: dict[str, Mission], missio
 
     scored = {}
     for s in pool:
-        sc, why, kw = base_score(s, brief_text, brief_toks, pm, stack)
+        sc, why, kw = base_score(s, brief_text, brief_toks, pm, stack, joined)
         scored[s["name"]] = {"skill": s, "score": sc, "reasons": why, "kw": kw}
 
     slots = merged_slots(pm, [missions[n] for n in secondary])
@@ -366,6 +423,23 @@ def route(brief: str, *, index: list[dict], missions: dict[str, Mission], missio
         (v for k, v in scored.items() if k not in taken and v["score"] >= 2),
         key=lambda v: (-v["score"], v["skill"]["name"]))[:5]
 
+    stream_plans = []
+    if streams:
+        for seg in split_streams(brief, missions):
+            sub = route(seg, index=index, missions=missions, harness=harness, repo=repo, limit=3, streams=False)
+            stream_plans.append({"text": seg, "mission": sub["mission"], "secondary": sub["secondary"],
+                                 "skills": [p["name"] for p in sub["skills"]], "gaps": sub["gaps"]})
+            # A stream's own process pick (design, author, debug, research…) joins the main plan.
+            for p in sub["skills"]:
+                if len(picks) >= limit:
+                    break
+                if p["name"] not in taken and p["slot"] not in ("domain", "verify"):
+                    picks.append({**p, "reasons": p["reasons"] + [f"stream {len(stream_plans)}"]})
+                    taken.add(p["name"])
+        if len(stream_plans) < 2:
+            stream_plans = []
+        considered = [v for v in considered if v["skill"]["name"] not in taken]
+
     names = [p["name"] for p in picks]
     return {
         "announce": f"nummode · {primary}{'+' + '+'.join(secondary) if secondary else ''} · skills: {', '.join(names) or '(none installed — proceed manually)'}",
@@ -375,9 +449,41 @@ def route(brief: str, *, index: list[dict], missions: dict[str, Mission], missio
         "skills": picks,
         "gaps": gaps,
         "considered": [{"name": v["skill"]["name"], "score": v["score"]} for v in considered],
+        "streams": stream_plans,
         "stack": sorted(stack),
         "harness": harness,
     }
+
+
+def split_streams(brief: str, missions: dict[str, Mission]) -> list[str]:
+    """Split a brief into separate deliverables. Returns [] when it holds fewer than two.
+
+    A segment starts a new stream only when it carries a mission signal of its own;
+    otherwise it is a continuation and is glued to the stream before it.
+    """
+    out: list[str] = []
+    lead = ""
+    for raw in STREAM_SPLIT_RE.split(brief):
+        seg = " ".join((raw or "").split()).strip(" ,:-")
+        if not seg:
+            continue
+        if len(seg.split()) >= STREAM_MIN_WORDS and detect_missions(seg, missions):
+            out.append((lead + " " + seg).strip())
+            lead = ""
+        elif out:
+            out[-1] += " " + seg
+        else:
+            lead = (lead + " " + seg).strip()
+    return out[:MAX_STREAMS] if len(out) >= 2 else []
+
+
+def with_builtins(index: list[dict], harness: str) -> list[dict]:
+    if harness != "claude":
+        return index
+    have = {s["name"] for s in index}
+    extra = [{"name": n, "desc": d, "tags": t, "path": "", "found_in": ["builtin:claude"], "hash": ""}
+             for n, d, t in CLAUDE_BUILTINS if n not in have]
+    return index + extra
 
 
 def _pick(v: dict, slot: str, score: int, reasons: list[str]) -> dict:
@@ -393,6 +499,8 @@ def default_harness() -> str:
         return "codex"
     if os.environ.get("CURSOR_TRACE_ID") or os.environ.get("CURSOR_AGENT"):
         return "cursor"
+    if os.environ.get("GEMINI_CLI"):
+        return "gemini"
     return "any"
 
 
@@ -407,6 +515,12 @@ def render(plan: dict, index_note: str) -> str:
         out.append("  (no installed skill scored ≥3)")
     for g in plan["gaps"]:
         out.append(f"gap: no installed skill for required slot `{g}`; do this step by hand and say so")
+    if plan.get("streams"):
+        out.append(f"streams: {len(plan['streams'])} deliverables. Brief each on its own; run in parallel only when they share no files.")
+        for i, st in enumerate(plan["streams"], 1):
+            text = st["text"] if len(st["text"]) <= 64 else st["text"][:63].rstrip() + "…"
+            mission_label = st["mission"] + ("+" + "+".join(st["secondary"]) if st["secondary"] else "")
+            out.append(f"  {i}. {mission_label:<16} {text}  →  {', '.join(st['skills']) or 'by hand'}")
     if plan["considered"]:
         out.append("also considered: " + ", ".join(f"{c['name']} ({c['score']})" for c in plan["considered"]))
     if plan["stack"]:
@@ -427,10 +541,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=MAX_SKILLS)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--no-refresh", action="store_true", help="use the saved index even if stale")
+    ap.add_argument("--no-streams", action="store_true", help="do not split the brief into deliverables")
     args = ap.parse_args(argv)
 
     if args.file:
-        brief = args.file.read_text(errors="ignore")
+        try:
+            brief = args.file.read_text(errors="ignore")
+        except OSError as e:
+            ap.error(f"cannot read --file {args.file}: {e.strerror or e}")
     elif args.brief == ["-"] or (not args.brief and not sys.stdin.isatty()):
         brief = sys.stdin.read()
     else:
@@ -454,8 +572,9 @@ def main(argv: list[str] | None = None) -> int:
         index = rows
 
     missions = parse_missions(find_missions_file().read_text())
-    plan = route(brief, index=index, missions=missions, mission=args.mission,
-                 harness=args.harness or default_harness(), repo=args.repo, limit=max(1, args.limit))
+    harness = args.harness or default_harness()
+    plan = route(brief, index=with_builtins(index, harness), missions=missions, mission=args.mission,
+                 harness=harness, repo=args.repo, limit=max(1, args.limit), streams=not args.no_streams)
     plan["index"] = note
     print(json.dumps(plan, indent=2) if args.json else render(plan, note))
     return 0

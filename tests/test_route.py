@@ -123,6 +123,73 @@ class DetectTests(unittest.TestCase):
             plan("anything", mission="nope")
 
 
+class RegressionTests(unittest.TestCase):
+    """Bugs found by routing a real, unpunctuated brief (2.3.0)."""
+
+    INDEX2 = INDEX + [
+        sk("copycat", "Inspects websites and reconstructs their UI in a codebase.", ["frontend"]),
+        sk("terminal-linux", "Operate a separate Linux desktop with screenshots and clicks.", ["general"]),
+        sk("skill-creator", "Create new skills and improve existing skills.", ["skills"]),
+        sk("flags-sdk", "Create and update feature flags in an app. Supports text and agent rules.", ["frontend"]),
+        sk("deep-research", "Multi-source research with a source ledger and cited findings.", ["research"]),
+    ]
+
+    def plan2(self, brief, **kw):
+        return R.route(brief, index=self.INDEX2, missions=MISSIONS, **kw)
+
+    def test_spaced_name_matches_skill(self):
+        names = [s["name"] for s in self.plan2("update my copy cat skill and add more features")["skills"]]
+        self.assertIn("copycat", names)
+
+    def test_changing_a_named_skill_is_skill_work(self):
+        out = self.plan2("update my copy cat skill and terminal linux, create more features and make them better")
+        self.assertEqual(out["mission"], "skill")
+        self.assertIn("skill-creator", [s["name"] for s in out["skills"]])
+
+    def test_filler_verbs_do_not_pick_skills(self):
+        names = [s["name"] for s in self.plan2("create a feature to update the text on the page")["skills"]]
+        self.assertNotIn("flags-sdk", names)
+
+    def test_secondary_mission_never_reports_a_gap(self):
+        index = [s for s in self.INDEX2 if s["name"] != "systematic-debugging"]
+        out = R.route("build a todo app and create the endpoint, then fix the failing test", index=index, missions=MISSIONS)
+        self.assertEqual(out["mission"], "build")
+        self.assertIn("fix", out["secondary"])
+        self.assertNotIn("debug", out["gaps"])
+
+    def test_streams_split_independent_deliverables(self):
+        out = self.plan2("update my copy cat skill and its agent also do deep research on vector databases "
+                         "and one more thing redesign the landing page hero with an svg animation")
+        self.assertEqual(len(out["streams"]), 3)
+        self.assertEqual([s["mission"] for s in out["streams"]], ["skill", "research", "design-ui"])
+        self.assertIn("deep-research", out["streams"][1]["skills"])
+        self.assertIn("frontend-design", out["streams"][2]["skills"])
+        # each stream's process skill reaches the main plan
+        self.assertIn("frontend-design", [s["name"] for s in out["skills"]])
+
+    def test_single_deliverable_has_no_streams(self):
+        self.assertEqual(plan("login test is failing, fix the bug")["streams"], [])
+        self.assertEqual(self.plan2("update copycat. also fix it", streams=False)["streams"], [])
+
+    def test_research_mission_fills_required_slot(self):
+        out = self.plan2("do deep research on which queue to use and cite sources")
+        self.assertEqual(out["mission"], "research")
+        self.assertEqual(out["skills"][0]["name"], "deep-research")
+
+    def test_builtins_only_for_claude(self):
+        self.assertIn("simplify", [s["name"] for s in R.with_builtins([], "claude")])
+        self.assertEqual(R.with_builtins([], "codex"), [])
+        names = [s["name"] for s in R.with_builtins([sk("simplify", "mine")], "claude")]
+        self.assertEqual(names.count("simplify"), 1)
+
+    def test_missing_brief_file_is_a_clean_error(self):
+        p = subprocess.run([sys.executable, str(SCRIPT), "--file", "/nonexistent/brief.md"],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 2)
+        self.assertNotIn("Traceback", p.stderr)
+        self.assertIn("cannot read --file", p.stderr)
+
+
 class RouteTests(unittest.TestCase):
     def names(self, brief, **kw):
         return [s["name"] for s in plan(brief, **kw)["skills"]]

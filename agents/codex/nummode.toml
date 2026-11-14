@@ -21,15 +21,16 @@ If the nummode skill is available, read its SKILL.md first and follow it. This i
 1. Size gate: a small edit or question → lite mode (≤1 skill, no announce). Otherwise full boot.
 2. Intake (silent): goal, deliverables, constraints, stack, success test.
 3. Route: `python3 ~/.nummode/scripts/route.py "<brief>"` (or `--file brief.md`). It refreshes the index, picks the mission (build, fix, refactor, design-ui, logo, audit, research, docs, deploy, skill, relay, parallel) and ranks installed skills.
-4. Adjust: the harness's own skill listing wins. Add listed skills the index cannot see; drop picks the harness cannot load. Required-slot gaps → do that step by hand.
-5. Lock 1–7 skills (process → domain → finish), announce, then load each skill before its step and follow it exactly.
-6. Execute: todos for multi-step work. Parallel subagents only for streams with no shared files or state, each with a self-contained brief. Prefer native Codex agents over relay when the worker is also Codex. After 3 failed attempts at the same thing, change approach.
-7. Relay: to hand a sub-task to another harness (Claude Code, Codex, Cursor, Antigravity/Gemini, OpenCode), run `python3 ~/.nummode/scripts/relay.py dispatch --to <harness> --task "…"`, then `relay.py wait`, then read `.relay/<id>/result.md` and continue. Default `--mode read`; `--mode write` only for files no one else touches.
-8. Verify with real commands (tests, build, run the app) before saying done. Report: what works + how to try it, checks run, skills used, assumptions, one next action.
+4. Streams: when the router prints a `streams:` block, each line is a separate deliverable with its own mission and skills. Brief each on its own.
+5. Adjust: the harness's own skill listing wins. Add listed skills the index cannot see; drop picks the harness cannot load. Required-slot gaps → do that step by hand.
+6. Lock 1–7 skills (process → domain → finish), announce, then load each skill before its step and follow it exactly.
+7. Execute: todos for multi-step work. Parallel subagents only for streams with no shared files or state, each with a self-contained brief. Prefer native Codex agents over relay when the worker is also Codex. After 3 failed attempts at the same thing, change approach.
+8. Relay: to hand a sub-task to another harness (Claude Code, Codex, Cursor, Antigravity/Gemini, OpenCode), run `python3 ~/.nummode/scripts/relay.py dispatch --to <harness> --task "…"`, then `relay.py wait`, then read `.relay/<id>/result.md` and continue. Default `--mode read`; `--mode write` only for files no one else touches. `--to codex,claude` asks several harnesses the same question.
+9. Verify with real commands (tests, build, run the app) before saying done. Report: what works + how to try it, checks run, skills used, assumptions, one next action.
 
 ## Paths
 
-- Relay: `~/.nummode/scripts/relay.py` (`harnesses`, `dispatch`, `status`, `wait`, `result`, `cancel`)
+- Relay: `~/.nummode/scripts/relay.py` (`harnesses`, `dispatch`, `status`, `wait`, `result`, `cancel`, `clean`)
 - Router: `~/.nummode/scripts/route.py` · Index: `~/.nummode/skill-index.md` (`refresh-index.py --check`)
 - Playbooks: `~/.nummode/playbooks/missions.md`, `intake.md`
 - Skill roots: `~/.agents/skills`, `~/.claude/skills` (+ enabled Claude Code plugins), `~/.cursor/skills`, `~/.codex/skills`, `~/.gemini/…/skills`

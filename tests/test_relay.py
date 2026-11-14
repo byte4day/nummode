@@ -126,6 +126,101 @@ class RelayTests(unittest.TestCase):
         self.assertTrue(all(r["available"] for r in rows))
 
 
+    def test_read_commands_do_not_create_the_relay_folder(self):
+        for cmd in (["status"], ["wait"], ["clean"]):
+            p = self.run_relay(*cmd)
+            self.assertIn("no relay tasks" if cmd != ["clean"] else "removed 0", p.stdout)
+        self.assertFalse((self.dir / ".relay").exists())
+        p = self.run_relay("result", "nope", check=False)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertNotIn("Traceback", p.stderr)
+        self.assertFalse((self.dir / ".relay").exists())
+
+    def test_bad_inputs_are_clean_errors(self):
+        for args in (["--task-file", "/nonexistent/task.md"], ["--task", "   "], ["--task", "x", "--timeout", "0"],
+                     ["--task", "x", "--cwd", "/nonexistent/dir"]):
+            p = self.run_relay("dispatch", "--to", "codex", *args, check=False)
+            self.assertEqual(p.returncode, 2, args)
+            self.assertNotIn("Traceback", p.stderr, args)
+        self.assertFalse((self.dir / ".relay").exists())
+
+    def test_cancel_keeps_the_outcome_of_a_finished_task(self):
+        self.run_relay("dispatch", "--to", "codex", "--task", "TASK-MARKER", "--wait")
+        task = self.only_task()
+        p = self.run_relay("cancel", task.name)
+        self.assertIn("already done", p.stdout)
+        self.assertEqual(json.loads((task / "meta.json").read_text())["status"], "done")
+
+    def test_cancel_stops_a_running_task(self):
+        env = dict(self.env, FAKE_SLEEP="30")
+        self.run_relay("dispatch", "--to", "codex", "--task", "TASK-MARKER", env=env)
+        task = self.only_task()
+        for _ in range(100):
+            if json.loads((task / "meta.json").read_text()).get("worker_pid"):
+                break
+            time.sleep(0.05)
+        self.run_relay("cancel", task.name)
+        self.assertEqual(json.loads((task / "meta.json").read_text())["status"], "cancelled")
+        p = self.run_relay("wait", "--timeout", "10", "--poll", "0.1", check=False)
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("cancelled", p.stdout)
+
+    def test_fan_out_sends_the_same_task_to_each_harness(self):
+        p = self.run_relay("dispatch", "--to", "codex,claude,codex", "--task", "TASK-MARKER", "--name", "fan")
+        self.assertEqual(p.stdout.count("relay → "), 2)
+        p = self.run_relay("wait", "--timeout", "30", "--poll", "0.1")
+        self.assertEqual(p.stdout.count("done"), 2)
+        tasks = sorted(d.name for d in (self.dir / ".relay").iterdir() if d.is_dir())
+        self.assertTrue(any("-claude-fan-" in t for t in tasks) and any("-codex-fan-" in t for t in tasks))
+
+    def test_fan_out_skips_a_missing_harness_and_says_so(self):
+        env = dict(self.env)
+        env["NUMMODE_RELAY_CURSOR_BIN"] = "/nonexistent/cursor-agent"
+        p = self.run_relay("dispatch", "--to", "codex,cursor", "--task", "TASK-MARKER", env=env, check=False)
+        self.assertEqual(p.returncode, 4)
+        self.assertIn("cursor CLI not found", p.stderr)
+        self.assertEqual(p.stdout.count("relay → "), 1)
+        self.run_relay("wait", "--timeout", "30", "--poll", "0.1")
+
+    def test_failure_shows_the_reason(self):
+        env = dict(self.env, FAKE_FAIL="1")
+        self.run_relay("dispatch", "--to", "codex", "--task", "TASK-MARKER", env=env)
+        p = self.run_relay("wait", "--timeout", "30", "--poll", "0.1", check=False)
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("why: boom", p.stdout)
+        self.assertIn("why: boom", self.run_relay("status").stdout)
+
+    def test_timeout_kills_a_worker_that_ignores_sigterm(self):
+        stubborn = self.dir / "stubborn"
+        stubborn.write_text("#!/usr/bin/env python3\nimport signal, time\n"
+                            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(60)\n")
+        stubborn.chmod(stubborn.stat().st_mode | stat.S_IEXEC)
+        env = dict(self.env, NUMMODE_RELAY_CODEX_BIN=str(stubborn))
+        started = time.monotonic()
+        p = subprocess.run([sys.executable, "-c",
+                            "import importlib.util,sys;s=importlib.util.spec_from_file_location('r',sys.argv[1]);"
+                            "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);m.KILL_GRACE=1;"
+                            "sys.exit(m.main(sys.argv[2:]))",
+                            str(SCRIPT), "dispatch", "--to", "codex", "--task", "x", "--timeout", "1", "--wait"],
+                           cwd=self.dir, env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(p.returncode, 1)
+        self.assertLess(time.monotonic() - started, 15)
+        meta = json.loads((self.only_task() / "meta.json").read_text())
+        self.assertEqual(meta["status"], "timeout")
+        self.assertIn("timed out", meta["error"])
+
+    def test_clean_removes_finished_tasks_only(self):
+        self.run_relay("dispatch", "--to", "codex", "--task", "TASK-MARKER", "--wait")
+        env = dict(self.env, FAKE_SLEEP="30")
+        self.run_relay("dispatch", "--to", "claude", "--task", "TASK-MARKER", "--name", "slow", env=env)
+        self.assertIn("removed 0", self.run_relay("clean").stdout)              # younger than 7 days
+        self.assertIn("would remove 1", self.run_relay("clean", "--all", "--dry-run").stdout)
+        self.assertIn("removed 1 task folder(s), kept 1", self.run_relay("clean", "--all").stdout)
+        left = self.only_task()
+        self.assertIn("-claude-slow-", left.name)
+        self.run_relay("cancel", left.name)
+
+
 class CommandTemplateTests(unittest.TestCase):
     def build(self, harness, mode):
         return R.build_command(harness, "/bin/x", "PROMPT", mode, Path("/w"), Path("/w/r.md"), model="m1")

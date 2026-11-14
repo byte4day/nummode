@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.3.0 — 2026-11-14
+
+### Added
+- **Streams**: a brief with two or more deliverables ("update A, also build B, one more thing: C") gets a `streams:` block from `route.py`, one line per deliverable with its own mission and skills. Each stream's process skill (design, author, research, debug) joins the main plan. `--no-streams` turns it off.
+- **claude.ai skills are indexed**: the newest `~/.claude/skills/synced/<account>/` folder is indexed as `anthropic-skills:<name>`, so `anthropic-skills:skill-creator`, `pdf`, `docx` and the rest can fill slots.
+- **Claude Code built-in skills** (`code-review`, `simplify`, `security-review`, `run`, `update-config`, `plugin-authoring`, `claude-api`) are added to the pool when the harness is Claude Code.
+- **Relay fan-out**: `relay.py dispatch --to codex,claude --task "…"` sends the same task to each harness for independent answers.
+- **`relay.py clean`** removes finished task folders (`--older-than DAYS`, `--all`, `--dry-run`). Running tasks are never touched.
+- **Failure reasons**: `relay.py wait` and `status` print a `why:` line for failed and timed-out tasks, taken from the task log.
+- `research` mission: `deep-research` is the first candidate and the slot is required; new signals (deep research, sources, cite, fact-check, literature, state of the art); optional `agent-reach` slot.
+- `design-ui` signals: animation, animated, svg, 3d.
+
+### Fixed
+- A brief that names an installed skill and asks to change it ("update my copycat skill and add features") now routes to the `skill` mission. It used to land on `build` because of "add" and "create".
+- Skill names written with a space match: "copy cat" finds `copycat`.
+- Filler verbs in skill descriptions (create, update, feature, text, add, fix…) no longer count as keyword hits. They pulled in unrelated skills on long briefs.
+- A secondary mission's required slot no longer reports a gap. Only the primary mission's required slots do.
+- `route.py --file <missing>` printed a Python traceback. It now exits 2 with a one-line error.
+- `relay.py status`, `wait`, `result`, `cancel` and `clean` created an empty `.relay/` folder in whatever directory they ran in. Only `dispatch` creates it now.
+- `relay.py cancel` on a finished task overwrote its status with `cancelled`. A finished task now keeps its outcome.
+- A worker that ignored SIGTERM at timeout hung the runner forever. It is killed after 5 seconds.
+- `relay.py dispatch` with a missing `--task-file`, an empty task, `--timeout 0` or a missing `--cwd` printed a traceback or started a task that could not run. Each is now a one-line error with exit 2.
+- `relay.py wait` with no tasks said nothing. It now says so.
+- Gemini CLI sessions are detected as the `gemini` harness.
+
+### Tests
+- 72 unit tests (was 52): indexer 20, relay 20, router 32. Installer smoke test unchanged at 11 checks.
+
 ## 2.2.1 — 2026-11-10
 
 ### Fixed

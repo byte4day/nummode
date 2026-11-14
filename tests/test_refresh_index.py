@@ -161,6 +161,28 @@ class CollectTests(FakeHome):
         self.assertEqual(MOD.collect_skills()[0], [])
 
 
+class SyncedTests(FakeHome):
+    def bucket(self, name, stamp, skills):
+        b = self.home / ".claude" / "skills" / "synced" / name
+        for sk_name in skills:
+            write_skill(b, sk_name, sk_name, f"{sk_name} from {name}")
+        (b / "manifest.json").write_text(json.dumps({"lastUpdated": stamp, "skills": []}))
+
+    def test_newest_synced_bucket_is_indexed_with_prefix(self):
+        self.bucket("old-account", 1000, ["deep-research", "pdf"])
+        self.bucket("new-account", 2000, ["skill-creator", "pdf"])
+        (self.home / ".claude" / "skills" / "synced" / ".bucket-x").mkdir()
+        rows, _ = MOD.collect_skills()
+        self.assertEqual([(r["name"], r["found_in"]) for r in rows],
+                         [("anthropic-skills:pdf", ["synced"]), ("anthropic-skills:skill-creator", ["synced"])])
+
+    def test_broken_manifest_falls_back_to_mtime(self):
+        b = self.home / ".claude" / "skills" / "synced" / "only"
+        write_skill(b, "docx", "docx", "Word files")
+        (b / "manifest.json").write_text("{nope")
+        self.assertEqual([r["name"] for r in MOD.collect_skills()[0]], ["anthropic-skills:docx"])
+
+
 class FreshnessTests(FakeHome):
     def test_check_cycle(self):
         root = self.home / ".claude" / "skills"
